@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+
+<script src="../obsx.js"></script>
+<script>
+let data = {
+  name: 'tomy',
+  age: 10,
+  parents: ['tomsen', 'lidia'],
+  head: {
+    hair: {
+      color: 'black',
+    },
+    eyes: ['left', 'right'],
+    mouth: {
+      size: 'big',
+    },
+  },
+  body: {
+    hands: [
+      {
+        which: 'left',
+        size: 30,
+      },
+      {
+        which: 'right',
+        size: 32,
+      },
+    ],
+    feet: [],
+  },
+}
+let obj = new Obsx(data)
+
+function log() {
+  console.log(obj)
+}
+</script>
+
+<div>
+  <p>在console中查看结果</p>
+  <button onclick="log()">查看整个obj</button>
+</div>
