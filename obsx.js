@@ -472,3 +472,29 @@ function isEqual(val1, val2) {
 function unionArray(a, b) {
   return a.concat(b.filter(v => !inArray(v, a)))
 }
+
+function inheritOf(obj) {
+  let output = Object.create(obj)
+  for (let prop in obj) {
+    let value = obj[prop]
+    if (isObject(value) || isArray(value)) {
+      output[prop] = inheritOf(value)
+    }
+  }
+  return output
+}
+
+function setPrototypeOf(obj, proto) {
+  if (Object.setPrototypeOf) {
+    Object.setPrototypeOf(obj, proto)
+  }
+  else {
+    obj.__proto__ = proto
+  }
+  for (let prop in proto) {
+    let value = proto[prop]
+    if ((isObject(obj[prop]) && isObject(value)) || (isArray(obj[prop]) && isArray(value))) {
+      setPrototypeOf(obj[prop], value)
+    }
+  }
+} 

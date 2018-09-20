@@ -34,9 +34,25 @@ let obj = new Obsx(data)
 function log() {
   console.log(obj)
 }
+
+function inherit() {
+  let parent = {
+    name: 'tomy',
+    feet: ['left', 'right'],
+    body: {
+      head: 1,
+      hands: 2,
+      neck: 1,
+    },
+  }
+  let sub = inheritOf(parent)
+  sub.name = 'nike'
+  console.log('inherit:', sub)
+}
 </script>
 
 <div>
   <p>在console中查看结果</p>
-  <button onclick="log()">查看整个obj</button>
+  <p><button onclick="log()">查看整个obj</button></p>
+  <p><button onclick="inherit()">测试继承</button></p>
 </div>
