@@ -48,6 +48,18 @@ function inherit() {
   let sub = inheritOf(parent)
   sub.name = 'nike'
   console.log('inherit:', sub)
+
+
+  let some = inheritOf({
+    name: 'tomy',
+    age: 10,
+    obj: {
+      child: 'noor',
+    },
+    arr: [1, 2, 3],
+  })
+  console.log(some)
+  console.log(valueOf(some))
 }
 </script>
 
