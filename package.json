@@ -1,0 +1,25 @@
+{
+  "name": "objext",
+  "version": "0.0.1",
+  "description": "a supper proxy of js object",
+  "main": "dist/objext.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tangshuang/objext.git"
+  },
+  "keywords": [
+    "object"
+  ],
+  "author": "tangshuang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tangshuang/objext/issues"
+  },
+  "homepage": "https://github.com/tangshuang/objext#readme"
+}

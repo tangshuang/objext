@@ -1,0 +1,266 @@
+import Objext from './objext'
+
+/**
+ * 浅遍历对象
+ * @param {*} data 
+ * @param {*} fn 
+ */
+export function each(data, fn) {
+  let keys = Object.keys(data)
+  keys.forEach(key => fn(data[key], key))
+}
+
+/**
+ * 深遍历对象
+ * @param {*} data 
+ * @param {*} fn 
+ */
+export function traverse(data, fn) {
+  let traverse = (data, path = '') => {
+    each(data, (value, key) => {
+      path = path ? path + '.' + key : key
+      fn(value, key, data, path)
+      if (typeof value === 'object') {
+        traverse(value, path)
+      }
+    })
+  }
+  traverse(data)
+}
+
+/**
+ * 将一个不规则的路径转化为规则路径
+ * @example
+ * makeKeyPath(makeKeyChain('name.0..body[0].head')) => name[0].body[0].head
+ */
+export function makeKeyChain(path) {
+  let chain = path.toString().split(/\.|\[|\]/).filter(item => !!item)
+  return chain
+}
+export function makeKeyPath(chain) {
+  let path = ''
+  for (let i = 0, len = chain.length; i < len; i ++) {
+    let key = chain[i]
+    if (/^[0-9]+$/.test(key)) {
+      path += '[' + key + ']'
+    }
+    else {
+      path += path ? '.' + key : key
+    }
+  }
+  return path
+}
+
+/**
+ * 根据keyPath读取对象属性值
+ * @param {*} obj 
+ * @param {*} path 
+ * @example 
+ * parse({ child: [ { body: { head: true } } ] }, 'child[0].body.head') => true
+ */
+export function parse(obj, path) {
+  let chain = makeKeyChain(path)
+
+  if (!chain.length) {
+    return obj
+  }
+
+  let target = obj
+  for (let i = 0, len = chain.length; i < len; i ++) {
+    let key = chain[i]
+    if (target[key] === undefined) {
+      return undefined
+    }
+    target = target[key]
+  }
+  return target
+}
+
+/**
+ * 根据keyPath设置对象的属性值
+ * @param {*} obj 
+ * @param {*} path 
+ * @param {*} value 
+ * @example
+ * assign({}, 'body.head', true) => { body: { head: true } }
+ */
+export function assign(obj, path, value) {
+  let chain = makeKeyChain(path)
+  let key = chain.pop()
+
+  if (!chain.length) {
+    obj[path] = value
+    return
+  }
+
+  let target = obj
+
+  for (let i = 0, len = chain.length; i < len; i ++) {
+    let key = chain[i]
+    let next = chain[i + 1] || key
+    if (/^[0-9]+$/.test(next) && !Array.isArray(target[key])) {
+      target[key] = []
+    }
+    else if (typeof target[key] !== 'object') {
+      target[key] = {}
+    }
+    target = target[key]
+  }
+
+  target[key] = value
+}
+
+/**
+ * 深克隆一个对象
+ * @param {*} obj 
+ */
+export function clone(obj) {
+  let parents = []
+  let clone = function(origin) {
+    if (!isObject(origin) && !isArray(origin)) {
+      return origin
+    }
+
+    let result = isArray(origin) ? [] : {}
+    let keys = Object.keys(origin)
+
+    parents.push({ origin, result })
+
+    for (let i = 0, len = keys.length; i < len; i ++) {
+      let key = keys[i]
+      let value = origin[key]
+      let referer = parents.find(item => item.origin === value)
+
+      if (referer) {
+        result[key] = referer.result
+      }
+      else {
+        result[key] = clone(value)
+      }
+    }
+
+    return result
+  }
+
+  let result = clone(obj)
+  parents = null
+  return result
+}
+
+export function isArray(arr) {
+  return Array.isArray(arr)
+} 
+
+export function isFunction(fn) {
+  return typeof fn === 'function'
+}
+
+export function isObject(obj) {
+  return obj && typeof obj === 'object' && obj.constructor === Object
+}
+
+export function isInstanceOf(ins, cons) {
+  return ins instanceof cons
+}
+
+export function isEqual(val1, val2) {
+  function equal(obj1, obj2) {
+    let keys1 = Object.keys(obj1)
+    let keys2 = Object.keys(obj2)
+    let keys = unionArray(keys1, keys2)
+
+    for (let i = 0, len = keys.length; i < len; i ++) {
+      let key = keys[i]
+
+      if (!inArray(key, keys1)) {
+        return false
+      }
+      if (!inArray(key, keys2)) {
+        return false
+      }
+
+      let value1 = obj1[key]
+      let value2 = obj2[key]
+      if (!isEqual(value1, value2)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  if (isObject(val1) && isObject(val2)) {
+    return equal(val1, val2)
+  }
+  else if (isArray(val1) && isArray(val2)) {
+    return equal(val1, val2)
+  }
+  else {
+    return val1 === val2
+  }
+}
+
+/**
+ * 求数组的并集
+ * @param {*} a 
+ * @param {*} b 
+ * @example 
+ * unionArray([1, 2], [1, 3]) => [1, 2, 3]
+ */
+export function unionArray(a, b) {
+  return a.concat(b.filter(v => !inArray(v, a)))
+}
+
+/**
+ * 以某个对象作为原型创建一个对象
+ * @param {*} obj 
+ */
+export function inheritOf(obj) {
+  if (!isObject(obj) || !isArray(obj)) {
+    return obj
+  }
+  let result = isArray(obj) ? [] : {}
+  setProto(result, obj)
+  for (let prop in obj) {
+    let value = obj[prop]
+    if (isObject(value) || isArray(value)) {
+      result[prop] = inheritOf(value)
+    }
+  }
+  return result
+}
+
+/**
+ * 获取一个复杂结构对象的字面量值，它会同时读取原型链上的可枚举值
+ * @param {*} obj 
+ */
+export function valueOf(obj) {
+  if (!isObject(obj) || !isArray(obj)) {
+    return obj
+  }
+  let result = isArray(obj) ? [] : {}
+  for (let key in obj) {
+    let value = obj[key]
+    if (isObject(value) || isArray(value)) {
+      result[key] = valueOf(value)
+    }
+    else {
+      result[key] = value
+    }
+  }
+  return result
+}
+
+/**
+ * 将一个对象的原型设置为proto
+ * @param {*} obj 
+ * @param {*} proto 
+ */
+export function setProto(obj, proto) {
+  if (Object.setPrototypeOf) {
+    Object.setPrototypeOf(obj, proto)
+  }
+  else {
+    obj.__proto__ = proto
+  }
+} 

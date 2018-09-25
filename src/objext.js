@@ -1,3 +1,25 @@
+import {
+  isArray,
+  isEqual,
+  isFunction,
+  isInstanceOf,
+  isObject,
+  unionArray,
+  each,
+  traverse,
+  makeKeyPath,
+  makeKeyChain,
+  parse,
+  assign,
+  clone,
+  inheritOf,
+  valueOf,
+  setProto,
+} from './utils'
+import {
+  xcreate,
+} from './helpers'
+
 /**
  * js超级对象
  * - 支持keyPath获取、设置数据
@@ -73,10 +95,10 @@ class Objext {
 
     // 传了prop的情况下，会拼出更详细的路径
     if (path) {
-      chain = chain.concat(makeChain(path))
+      chain = chain.concat(makeKeyChain(path))
     }
 
-    return makePath(chain)
+    return makeKeyPath(chain)
   }
   /**
    * 全量更新数据，老数据会被删除
@@ -411,318 +433,4 @@ class Objext {
   toString() {
     return JSON.stringify(valueOf(this.$$data))
   }
-
-  static create(value, key = '', target = null) {
-    if (isInstanceOf(value, Objext)) {
-      value.$define('$$key', key)
-      value.$define('$$parent', target)
-      return value
-    }
-    else if (isObject(value)) {
-      return Objext.xobject(value, key, target)
-    }
-    else if (isArray(value)) {
-      return Objext.xarray(value, key, target)
-    }
-    else {
-      return value
-    }
-  }
-  static xobject(value, key, target) {
-    let data = Object.assign({}, value)
-    let objx = new Objext()
-
-    objx.$define('$$key', key)
-    objx.$define('$$parent', target)
-    objx.$put(data)
-
-    return objx
-  }
-  static xarray(value, key, target) {
-    let data = [].concat(value)
-    //  创建一个proto作为一个数组新原型，这个原型的push等方法经过改造
-    let proto = []
-    let descriptors = {
-      $$key: { value: key },
-      $$parent: { value: target },
-    }
-    let methods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']
-    methods.forEach((method) => {
-      descriptors[method] = {
-        value: function(...args) {
-          let oldValue = valueOf(this)
-          Array.prototype[method].call(this, ...args)
-          this.forEach((item, i) => {
-            // 调整元素的path信息，该元素的子元素path也会被调整
-            this[i] = Objext.create(item, i, this)
-          })
-          let newValue = valueOf(this)
-          let root = target.$$root
-          let path = target.$path()
-          root.$dispatch(path, newValue, oldValue)
-        }
-      }
-    })
-    Object.defineProperties(proto, descriptors)
-    // 用proto作为arr的原型
-    setProto(data, proto)
-    return data
-  }
 }
-
-
-/**
- * 浅遍历对象
- * @param {*} data 
- * @param {*} fn 
- */
-function each(data, fn) {
-  let keys = Object.keys(data)
-  keys.forEach(key => fn(data[key], key))
-}
-
-/**
- * 深遍历对象
- * @param {*} data 
- * @param {*} fn 
- */
-function traverse(data, fn) {
-  let traverse = (data, path = '') => {
-    each(data, (value, key) => {
-      path = path ? path + '.' + key : key
-      fn(value, key, data, path)
-      if (typeof value === 'object') {
-        traverse(value, path)
-      }
-    })
-  }
-  traverse(data)
-}
-
-function makeChain(path) {
-  let chain = path.toString().split(/\.|\[|\]/).filter(item => !!item)
-  return chain
-}
-function makePath(chain) {
-  let path = ''
-  for (let i = 0, len = chain.length; i < len; i ++) {
-    let key = chain[i]
-    if (/^[0-9]+$/.test(key)) {
-      path += '[' + key + ']'
-    }
-    else {
-      path += path ? '.' + key : key
-    }
-  }
-  return path
-}
-/**
- * 将一个不规则的路径转化为规则路径
- * @param {*} path 
- */
-function make(path) {
-  let chain = makeChain(path)
-  return makePath(chain)
-}
-
-/**
- * 根据keyPath读取对象属性值
- * @param {*} obj 
- * @param {*} path 
- */
-function parse(obj, path) {
-  let chain = makeChain(path)
-
-  if (!chain.length) {
-    return obj
-  }
-
-  let target = obj
-  for (let i = 0, len = chain.length; i < len; i ++) {
-    let key = chain[i]
-    if (target[key] === undefined) {
-      return undefined
-    }
-    target = target[key]
-  }
-  return target
-}
-
-/**
- * 根据keyPath设置对象的属性值
- * @param {*} obj 
- * @param {*} path 
- * @param {*} value 
- */
-function assign(obj, path, value) {
-  let chain = makeChain(path)
-  let tail = chain.pop()
-
-  if (!chain.length) {
-    obj[path] = value
-    return
-  }
-
-  let target = obj
-
-  for (let i = 0, len = chain.length; i < len; i ++) {
-    let key = chain[i]
-    let next = chain[i + 1] || tail
-    if (/^[0-9]+$/.test(next) && !Array.isArray(target[key])) {
-      target[key] = []
-    }
-    else if (typeof target[key] !== 'object') {
-      target[key] = {}
-    }
-    target = target[key]
-  }
-
-  target[tail] = value
-}
-
-/**
- * 克隆一个对象
- * @param {*} obj 
- * @param {*} fn 
- */
-function clone(obj, fn) {
-  let parents = []
-  let clone = function(origin, path = '', obj) {
-    if (!isObject(origin) && !isArray(origin)) {
-      return origin
-    }
-
-    let result = isArray(origin) ? [] : {}
-    let keys = Object.keys(origin)
-
-    parents.push({ obj, path, origin, result })
-
-    for (let i = 0, len = keys.length; i < len; i ++) {
-      let key = keys[i]
-      let value = origin[key]
-      let referer = parents.find(item => item.origin === value)
-      let computed = isFunction(fn) ? fn(value, key, origin, path, obj, referer) : value
-
-      if (!isObject(computed) && !isArray(computed)) {
-        result[key] = computed
-      }
-      else {
-        if (referer) {
-          result[key] = referer.result
-        }
-        else {
-          result[key] = clone(computed, path ? path + '.' + key : key)
-        }
-      }
-    }
-
-    return result
-  }
-
-  let result = clone(obj, '', obj)
-  parents = null
-  return result
-}
-
-function isArray(arr) {
-  return Array.isArray(arr)
-} 
-
-function isFunction(fn) {
-  return typeof fn === 'function'
-}
-
-function isObject(obj) {
-  return obj && typeof obj === 'object' && obj.constructor === Object
-}
-
-function isInstanceOf(ins, cons) {
-  return ins instanceof cons
-}
-
-function isEqual(val1, val2) {
-  function equal(obj1, obj2) {
-    let keys1 = Object.keys(obj1)
-    let keys2 = Object.keys(obj2)
-    let keys = unionArray(keys1, keys2)
-
-    for (let i = 0, len = keys.length; i < len; i ++) {
-      let key = keys[i]
-
-      if (!inArray(key, keys1)) {
-        return false
-      }
-      if (!inArray(key, keys2)) {
-        return false
-      }
-
-      let value1 = obj1[key]
-      let value2 = obj2[key]
-      if (!isEqual(value1, value2)) {
-        return false
-      }
-    }
-
-    return true
-  }
-
-  if (isObject(val1) && isObject(val2)) {
-    return equal(val1, val2)
-  }
-  else if (isArray(val1) && isArray(val2)) {
-    return equal(val1, val2)
-  }
-  else {
-    return val1 === val2
-  }
-}
-
-/**
- * 求数组的并集
- * @param {*} a 
- * @param {*} b 
- */
-function unionArray(a, b) {
-  return a.concat(b.filter(v => !inArray(v, a)))
-}
-
-function inheritOf(obj) {
-  if (!isObject(obj) || !isArray(obj)) {
-    return obj
-  }
-  let result = isArray(obj) ? [] : {}
-  setProto(result, obj)
-  for (let prop in obj) {
-    let value = obj[prop]
-    if (isObject(value) || isArray(value)) {
-      result[prop] = inheritOf(value)
-    }
-  }
-  return result
-}
-
-function valueOf(obj) {
-  if (!isObject(obj) || !isArray(obj)) {
-    return obj
-  }
-  let result = isArray(obj) ? [] : {}
-  for (let key in obj) {
-    let value = obj[key]
-    if (isObject(value) || isArray(value)) {
-      result[key] = valueOf(value)
-    }
-    else {
-      result[key] = value
-    }
-  }
-  return result
-}
-
-function setProto(obj, proto) {
-  if (Object.setPrototypeOf) {
-    Object.setPrototypeOf(obj, proto)
-  }
-  else {
-    obj.__proto__ = proto
-  }
-} 
