@@ -16,6 +16,7 @@ import {
   inheritOf,
   valueOf,
   setProto,
+  getStringHashcode,
 } from './utils'
 import {
   xcreate,
@@ -25,16 +26,8 @@ import {
   xset,
 } from './helpers'
 
-/**
- * js超级对象
- * - 支持keyPath获取、设置数据
- * - 响应式，可以通过watch监听某个keyPath
- * - 数据版本控制，通过打tag和reset，可以随时恢复数据
- * - 数据校验
- * - 数据锁，锁住之后，不能做任何数据修改，连$dispatch都无效
- */
-
-export default class Objext {
+export default Objext
+export class Objext {
   constructor(data) {
     this.$define('$$typeof', {})
     this.$define('$$snapshots', [])
@@ -54,12 +47,6 @@ export default class Objext {
     if (data) {
       this.$put(data)
     }
-
-    // 改动数据时，自动改动$$data上的数据，由于父子节点之间的$$data是引用关系，因此，当子节点的这个动作被触发时，父节点的$$data也被修改了
-    this.$watch('*', (e, newValue) => {
-      let { path } = e
-      assign(this.$$data, path, newValue)
-    })
   }
   /**
    * 在试图上设置一个不可枚举属性
@@ -97,6 +84,11 @@ export default class Objext {
     }
 
     return makeKeyPath(chain)
+  }
+  get $$hash() {
+    let data = this.toString()
+    let hash = getStringHashcode(data)
+    return hash
   }
   /**
    * 获取key对应的值
@@ -249,40 +241,36 @@ export default class Objext {
     }
   
     define(node, key)
+    node.$collect(key, getter) // 依赖收集
   }
   /**
    * 依赖监听
    */
-  // $dependent() {
-  //   let root = this.$$root
-  //   let { getter, path, target } = root.$$dep
-  //   if (root.$$deps.find(item => item.path === path && item.getter === getter && item.target === target)) {
-  //     return false
-  //   }
-  //   let callback = () => {
-  //     let oldValue = parse(root.$$data, path)
-  //     let newValue = root.$collect(path, getter)
-  //     root.$dispatch(path, newValue, oldValue)
-  //   }
-  //   root.$$deps.push({ path, getter, target })
-  //   root.$watch(target, callback, true)
-  //   return true
-  // }
-  // /**
-  //  * 依赖收集
-  //  * @param {*} getter 
-  //  */
-  // $collect(path, getter) {
-  //   let root = this.$$root
-  //   root.$define('$$dep', { path, getter })
-  //   let value = getter()
-  //   assign(root.$$data, path, value)
-  //   root.$define('$$dep', {})
-  //   return value
-  // }
-  
-  
-  
+  $dependent() {
+    let { getter, key, dependency, target } = this.$$dep
+    if (this.$$deps.find(item => item.key === key && item.getter === getter && item.dependency === dependency && item.target === target)) {
+      return false
+    }
+    let callback = () => {
+      let oldValue = parse(this.$$data, key)
+      let newValue = getter.call(this)
+      assign(this.$$data, key, newValue)
+
+      this.$dispatch(key, newValue, oldValue)
+    }
+    this.$$deps.push({ getter, key, dependency, target })
+    target.$watch(dependency, callback, true)
+    return true
+  }
+  /**
+   * 依赖收集
+   */
+  $collect(key, getter) {
+    this.$define('$$dep', { key, getter })
+    let value = getter.call(this)
+    this.$define('$$dep', {})
+    return value
+  }
   /**
    * 判断一个key是否在当前dataview中存在
    * @param {*} key
@@ -365,7 +353,7 @@ export default class Objext {
     let propagate = (target) => {
       let parent = target.$$parent
       let key = target.$$key
-      if (parent) {
+      if (parent && parent.$dispatch) {
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
         parent.$dispatch(finalPath, newValue, oldValue)
@@ -485,7 +473,7 @@ export default class Objext {
     let propagate = (target) => {
       let parent = target.$$parent
       let key = target.$$key
-      if (parent) {
+      if (parent && parent.$validate) {
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
         parent.$validate(finalPath, data)

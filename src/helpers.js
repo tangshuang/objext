@@ -6,6 +6,7 @@ import {
   setProto,
   valueOf,
   makeKeyChain,
+  assign,
 } from './utils'
 
 /**
@@ -55,8 +56,22 @@ export function xdefine(target, key, value) {
       let oldValue = valueOf($$)
       let newValue = valueOf(data)
       target.$dispatch(key, newValue, oldValue)
+
+      // 改动$$data上的数据，由于父子节点之间的$$data是引用关系，因此，当子节点的这个动作被触发时，父节点的$$data也被修改了
+      assign(target.$$data, key, newValue)
     },
     get() {
+      /**
+       * 这里需要详细解释一下
+       * 由于依赖收集中$$dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
+       * 但是，由于在进行监听时，deep为true，因此，即使是只有顶层属性被监听，当顶层属性的深级属性变动时，这个监听也会被触发，因此也能带来依赖响应
+       */
+      if (target.$$dep && target.$$dep.key && target.$$dep.getter) {
+        target.$$dep.dependency = key
+        target.$$dep.target = target
+        target.$dependent()
+      }
+
       return $$
     },
   })
@@ -108,12 +123,7 @@ export function xarray(value, key, target) {
     // 这些属性都是为了冒泡准备的，arra没有$set等设置相关的属性
     $$key: { value: key },
     $$parent: { value: target },
-    $$locked: { value: false },
-    $$listeners: { value: [] },
-    $$validators: { value: [] },
     $$data: { get: () => target.$$data[key] },
-    $dispatch: { value: Objext.prototype.$dispatch.bind(target) },
-    $validate: { value: Objext.prototype.$validate.bind(target) },
   }
   let methods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']
   methods.forEach((method) => {
