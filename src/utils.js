@@ -1,5 +1,3 @@
-import Objext from './objext'
-
 /**
  * 浅遍历对象
  * @param {*} data 
@@ -19,9 +17,12 @@ export function traverse(data, fn) {
   let traverse = (data, path = '') => {
     each(data, (value, key) => {
       path = path ? path + '.' + key : key
-      fn(value, key, data, path)
-      if (typeof value === 'object') {
+      if (isObject(value) || isArray(value)) {
+        fn(value, key, data, path, true)
         traverse(value, path)
+      }
+      else {
+        fn(value, key, data, path, false)
       }
     })
   }
@@ -163,6 +164,24 @@ export function isInstanceOf(ins, cons) {
   return ins instanceof cons
 }
 
+export function isEmpty(value) {
+  if (isArray(value)) {
+    return value.length === 0
+  }
+  else if (isObject(value)) {
+    return Object.keys(value).length
+  }
+  else if (typeof value === 'string') {
+    return value === ''
+  }
+  else if (value === null || value === undefined || isNaN(value)) {
+    return true
+  }
+  else {
+     return false
+  }
+}
+
 export function isEqual(val1, val2) {
   function equal(obj1, obj2) {
     let keys1 = Object.keys(obj1)
@@ -252,7 +271,7 @@ export function valueOf(obj) {
 }
 
 /**
- * 将一个对象的原型设置为proto
+ * 重新设置对象的原型为proto
  * @param {*} obj 
  * @param {*} proto 
  */
