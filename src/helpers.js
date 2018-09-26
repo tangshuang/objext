@@ -30,7 +30,7 @@ export function xset(target, path, value) {
     node = node[current]
   }
 
-  xdefine(node, current, value)
+  xdefine(node, key, value)
 }
 
 export function xdefine(target, key, value) {
@@ -44,16 +44,17 @@ export function xdefine(target, key, value) {
         return
       }
 
+      
       // 校验数据
       // 会冒泡上去
       target.$validate(key, v)
-
+      
+      let oldValue = valueOf($$)
       let data = xcreate(v, key, target)
       $$ = data
 
       // 触发watch
       // 会冒泡上去
-      let oldValue = valueOf($$)
       let newValue = valueOf(data)
       target.$dispatch(key, newValue, oldValue)
 
@@ -114,6 +115,7 @@ export function xobject(value, key, target) {
   return objx
 }
 export function xarray(value, key, target) {
+  // 创建引用，这样当修改子节点的时候，父节点自动修改
   if (!target.$$data[key]) {
     target.$$data[key] = []
   }
@@ -123,7 +125,7 @@ export function xarray(value, key, target) {
     // 这些属性都是为了冒泡准备的，arra没有$set等设置相关的属性
     $$key: { value: key },
     $$parent: { value: target },
-    $$data: { get: () => target.$$data[key] },
+    $$data: { value: target.$$data[key] },
   }
   let methods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']
   methods.forEach((method) => {
@@ -150,6 +152,7 @@ export function xarray(value, key, target) {
   setProto(data, proto)
   value.forEach((item, i) => {
     xdefine(data, i, item)
+    target.$$data[key][i] = item
   })
   return data
 }

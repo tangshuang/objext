@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 
-<script src="../obsx.js"></script>
+<script src="../dist/objext.js"></script>
 <script>
+const { Objext } = window.objext
 let data = {
   name: 'tomy',
   age: 10,
@@ -26,13 +27,16 @@ let data = {
         size: 32,
       },
     ],
-    feet: [],
+    feet: 2,
   },
 }
-let obj = new Obsx(data)
+let objx = new Objext(data)
+objx.$watch('body.feet', (e, newValue, oldValue) => {
+  console.log(e, newValue, oldValue)
+})
 
 function log() {
-  console.log(obj)
+  console.log(objx)
 }
 
 function inherit() {

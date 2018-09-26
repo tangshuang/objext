@@ -26,7 +26,6 @@ import {
   xset,
 } from './helpers'
 
-export default Objext
 export class Objext {
   constructor(data) {
     this.$define('$$typeof', {})
@@ -124,9 +123,6 @@ export class Objext {
       return
     }
 
-    // 确保$$data里面是有数据的，这样在getter第一次计算的时候才不会报错
-    Object.assign(this.$$data, data)
-
     let keys = Object.keys(data)
     let getters = []
     keys.forEach((key) => {
@@ -144,6 +140,10 @@ export class Objext {
     // 设置计算属性
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
+    })
+    // 依赖收集
+    getters.forEach((item) => {
+      this.$collect(item.key, item.getter)
     })
   }
   /**
@@ -199,49 +199,28 @@ export class Objext {
    * @param {*} key 
    * @param {*} getter 
    */
-  $describe(path, getter) {
-    let define = (target, key) => {
-      Object.defineProperty(target, key, {
-        configurable: true,
-        enumerable : true,
-        get() {  
-          if (target.$has(key)) {
-            let value = parse(target.$$data, key)
-            return value
-          }
-          else {
-            let value = getter.call(target.$$data)
-            assign(target.$$data, key, value)
-            return value
-          }
-        },
-      })
-    }
+  $describe(key, getter) {
+    Object.defineProperty(this, key, {
+      configurable: true,
+      enumerable : true,
+      get: () => {  
+        if (this.$has(key)) {
+          let value = parse(this.$$data, key)
+          return value
+        }
+        else {
+          let value = getter.call(this.$$data)
+          assign(this.$$data, key, value)
+          return value
+        }
+      },
+    })
 
-    let chain = makeKeyChain(path)
-    let key = chain.pop()
-    
-    if (!chain.length) {
-      define(this, key)
-      return
+    // 依赖收集，首次运行的时候，有些属性可能还没赋值上去，所以要用一个try包起来
+    try {
+      this.$collect(key, getter) 
     }
-  
-    let node = this
-  
-    for (let i = 0, len = chain.length; i < len; i ++) {
-      let current = chain[i]
-      let next = chain[i + 1] || key
-      if (/[0-9]+/.test(next) && !isArray(node[current])) {
-        xdefine(node, current, [])
-      }
-      else if (!isObject(node[current])) {
-        xdefine(node, current, {})
-      }
-      node = node[current]
-    }
-  
-    define(node, key)
-    node.$collect(key, getter) // 依赖收集
+    catch(e) {}
   }
   /**
    * 依赖监听
@@ -488,3 +467,5 @@ export class Objext {
     return JSON.stringify(valueOf(this.$$data))
   }
 }
+
+export default Objext

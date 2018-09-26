@@ -4,7 +4,7 @@ module.exports = {
   output: {
     path: __dirname + '/dist',
     filename: 'objext.js',
-    library: objext,
+    library: 'objext',
     libraryTarget: 'umd',
   },
   module: {
