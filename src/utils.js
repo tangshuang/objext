@@ -87,11 +87,16 @@ export function parse(obj, path) {
  */
 export function assign(obj, path, value) {
   let chain = makeKeyChain(path)
+  
+  if (!chain.length) {
+    return obj
+  }
+
   let key = chain.pop()
 
   if (!chain.length) {
-    obj[path] = value
-    return
+    obj[key] = value
+    return obj
   }
 
   let target = obj
@@ -109,6 +114,8 @@ export function assign(obj, path, value) {
   }
 
   target[key] = value
+
+  return obj
 }
 
 /**
@@ -158,6 +165,14 @@ export function isFunction(fn) {
 
 export function isObject(obj) {
   return obj && typeof obj === 'object' && obj.constructor === Object
+}
+
+export function inArray(item, arr) {
+  return arr.indexOf(item) > -1
+}
+
+export function inObject(key, obj) {
+  return inArray(key, Object.keys(obj))
 }
 
 export function isInstanceOf(ins, cons) {
@@ -254,20 +269,22 @@ export function inheritOf(obj) {
  * @param {*} obj 
  */
 export function valueOf(obj) {
-  if (!isObject(obj) || !isArray(obj)) {
+  if (obj && typeof obj === 'object') {
+    let result = isArray(obj) ? [] : {}
+    for (let key in obj) {
+      let value = obj[key]
+      if (value && typeof value === 'object') {
+        result[key] = valueOf(value)
+      }
+      else {
+        result[key] = value
+      }
+    }
+    return result
+  }
+  else {
     return obj
   }
-  let result = isArray(obj) ? [] : {}
-  for (let key in obj) {
-    let value = obj[key]
-    if (isObject(value) || isArray(value)) {
-      result[key] = valueOf(value)
-    }
-    else {
-      result[key] = value
-    }
-  }
-  return result
 }
 
 /**

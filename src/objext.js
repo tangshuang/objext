@@ -4,6 +4,7 @@ import {
   isFunction,
   isInstanceOf,
   isObject,
+  inObject,
   unionArray,
   isEmpty,
   each,
@@ -28,7 +29,6 @@ import {
 
 export class Objext {
   constructor(data) {
-    this.$define('$$typeof', {})
     this.$define('$$snapshots', [])
     this.$define('$$validators', [])
     this.$define('$$listeners', [])
@@ -141,9 +141,9 @@ export class Objext {
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
     })
-    // 依赖收集
+    // 依赖初始化值
     getters.forEach((item) => {
-      this.$collect(item.key, item.getter)
+      this.$compute(item.key, item.getter)
     })
   }
   /**
@@ -160,12 +160,10 @@ export class Objext {
     // 校验过程不中断下方的赋值，如果想要中断，可以在warn里面使用throw new Error
     this.$validate(path, value)
     
+    let oldData = valueOf(this.$$data)
     xset(this, path, value)
-
-    let data = this.$$data
-    let oldValue = parse(data, path)
-    let newValue = value
-    this.$dispatch(path, newValue, oldValue)
+    let newData = valueOf(this.$$data)
+    this.$dispatch(path, newData, oldData)
   }
   /**
    * 移除一个属性，不能直接用delete obj.prop这样的操作，否则不能同步内部数据，不能触发$dispatch
@@ -178,7 +176,7 @@ export class Objext {
 
     let chain = makeKeyChain(path)
     let key = chain.pop()
-    let oldValue = parse(this.$$data, path)
+    let oldData = valueOf(this.$$data)
 
     if (!chain.length) {
       delete this[key]
@@ -192,7 +190,8 @@ export class Objext {
       delete $node[key]
     }
 
-    this.$dispatch(path, null, oldValue)
+    let newData = valueOf(this.$$data)
+    this.$dispatch(path, newData, oldData)
   }
   /**
    * 设置一个计算属性
@@ -204,59 +203,57 @@ export class Objext {
       configurable: true,
       enumerable : true,
       get: () => {  
-        if (this.$has(key)) {
-          let value = parse(this.$$data, key)
-          return value
-        }
-        else {
-          let value = getter.call(this.$$data)
-          assign(this.$$data, key, value)
-          return value
-        }
+        let value = parse(this.$$data, key)
+        return value
       },
     })
 
     // 依赖收集，首次运行的时候，有些属性可能还没赋值上去，所以要用一个try包起来
     try {
-      this.$collect(key, getter) 
+      this.$compute(key, getter) 
     }
     catch(e) {}
   }
   /**
-   * 依赖监听
+   * 依赖收集
    */
-  $dependent() {
+  $collect() {
     let { getter, key, dependency, target } = this.$$dep
-    if (this.$$deps.find(item => item.key === key && item.getter === getter && item.dependency === dependency && item.target === target)) {
+
+    if (this.$$deps.find(item => item.key === key && item.dependency === dependency)) {
       return false
     }
     let callback = () => {
-      let oldValue = parse(this.$$data, key)
-      let newValue = getter.call(this)
-      assign(this.$$data, key, newValue)
-
-      this.$dispatch(key, newValue, oldValue)
+      let oldData = valueOf(this.$$data)
+      this.$compute(key, getter)
+      let newData = valueOf(this.$$data)
+      this.$dispatch(key, newData, oldData)
     }
-    this.$$deps.push({ getter, key, dependency, target })
+    this.$$deps.push({ key, dependency })
     target.$watch(dependency, callback, true)
     return true
   }
   /**
-   * 依赖收集
+   * 依赖计算赋值
    */
-  $collect(key, getter) {
+  $compute(key, getter) {
     this.$define('$$dep', { key, getter })
-    let value = getter.call(this)
+    let data = this.$$data
+    let oldValue = parse(data, key)
+    let newValue = getter.call(this)
+    if (!isEqual(oldValue, newValue)) {
+      assign(data, key, newValue)
+    }
     this.$define('$$dep', {})
-    return value
+    return newValue
   }
   /**
    * 判断一个key是否在当前dataview中存在
    * @param {*} key
    */
-  $has(key) {
-    let target = this
-    let chain = key.split(/\.|\[|\]/).filter(item => !!item)
+  $has(path) {
+    let target = this.$$data // 因为依赖收集里面要用到$has，如果这里直接用this的话，会导致死循环
+    let chain = makeKeyChain(path)
 
     for (let i = 0, len = chain.length; i < len; i ++) {
       let key = chain[i]
@@ -272,6 +269,8 @@ export class Objext {
     if (this.$$locked) {
       return
     }
+
+    path = makeKeyPath(makeKeyChain(path))
 
     this.$$listeners.push({
       path,
@@ -294,12 +293,18 @@ export class Objext {
     indexes.reverse()
     indexes.forEach(i => this.$$listeners.splice(i, 1))
   }
-  $dispatch(path, newValue, oldValue) {
+  /**
+   * 触发watchers，注意，newData和oldData不是path对应的值，而是整个objx的值，在watcher的回调函数中，得到的是wathcher自己的path对应的值
+   * @param {*} path 
+   * @param {*} newData this的新数据
+   * @param {*} oldData this的老数据
+   */
+  $dispatch(path, newData, oldData) {
     if (this.$$locked) {
       return
     }
 
-    let listeners = this.$$listeners.filter(item => item.path === path || (item.deep && path.indexOf(item.path + '.') === 0) || item.path === '*')
+    let listeners = this.$$listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0) || item.path === '*')
     let propagation = true
     let pipeline = true
     let stopPropagation = () => propagation = false
@@ -315,6 +320,12 @@ export class Objext {
 
     for (let i = 0, len = listeners.length; i < len; i ++) {
       let item = listeners[i]
+      e.key = item.path
+      e.type = item.deep ? 'deep' : 'shallow'
+
+      let targetPath = item.path === '*' ? '' : item.path
+      let newValue = parse(newData, targetPath)
+      let oldValue = parse(oldData, targetPath)
       item.fn(e, newValue, oldValue)
       
       // 阻止继续执行其他listener
@@ -335,7 +346,9 @@ export class Objext {
       if (parent && parent.$dispatch) {
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
-        parent.$dispatch(finalPath, newValue, oldValue)
+        let parentNewData = valueOf(parent.$$data)
+        let parentOldData = assign(clone(parentNewData), key, oldData)
+        parent.$dispatch(finalPath, parentNewData, parentOldData)
         propagate(parent)
       }
     }
@@ -463,8 +476,11 @@ export class Objext {
 
     return result
   }
+  valueOf() {
+    return valueOf(this.$$data)
+  }
   toString() {
-    return JSON.stringify(valueOf(this.$$data))
+    return JSON.stringify(this.valueOf())
   }
 }
 

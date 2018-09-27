@@ -7,6 +7,9 @@ import {
   valueOf,
   makeKeyChain,
   assign,
+  parse,
+  each,
+  isEqual,
 } from './utils'
 
 /**
@@ -31,6 +34,12 @@ export function xset(target, path, value) {
   }
 
   xdefine(node, key, value)
+  
+  let data = target.$$data
+  let oldValue = parse(data, path)
+  if (!isEqual(oldValue, value)) {
+    assign(data, path, value)
+  }
 }
 
 export function xdefine(target, key, value) {
@@ -43,23 +52,26 @@ export function xdefine(target, key, value) {
       if (target.$$locked) {
         return
       }
-
       
       // 校验数据
       // 会冒泡上去
       target.$validate(key, v)
-      
-      let oldValue = valueOf($$)
+
+      let oldData = valueOf(target.$$data)
+      let oldValue = oldData[key]
       let data = xcreate(v, key, target)
       $$ = data
 
+      // 改动$$data上的数据，由于父子节点之间的$$data是引用关系，因此，当子节点的这个动作被触发时，父节点的$$data也被修改了
+      // 由于数据的继承性，只有当数据值被真正修改的时候，才更新$$data
+      if (!isEqual(oldValue, v)) {
+        assign(target.$$data, key, v)
+      }
+
       // 触发watch
       // 会冒泡上去
-      let newValue = valueOf(data)
-      target.$dispatch(key, newValue, oldValue)
-
-      // 改动$$data上的数据，由于父子节点之间的$$data是引用关系，因此，当子节点的这个动作被触发时，父节点的$$data也被修改了
-      assign(target.$$data, key, newValue)
+      let newData = valueOf(target.$$data)
+      target.$dispatch(key, newData, oldData)
     },
     get() {
       /**
@@ -70,7 +82,7 @@ export function xdefine(target, key, value) {
       if (target.$$dep && target.$$dep.key && target.$$dep.getter) {
         target.$$dep.dependency = key
         target.$$dep.target = target
-        target.$dependent()
+        target.$collect()
       }
 
       return $$
@@ -95,7 +107,6 @@ export function xcreate(value, key, target) {
   }
 }
 export function xobject(value, key, target) {
-  let data = Object.assign({}, value)
   let objx = new Objext()
 
   objx.$define('$$key', key)
@@ -110,45 +121,70 @@ export function xobject(value, key, target) {
     get: () => target.$$data[key],
   })
   
-  objx.$put(data)
+  objx.$put(value)
 
   return objx
 }
 export function xarray(value, key, target) {
+  let data = []
+  let prototypes = Objext.prototype
+  //  创建一个proto作为一个数组新原型，这个原型的push等方法经过改造
+  let proto = []
+
   // 创建引用，这样当修改子节点的时候，父节点自动修改
   if (!target.$$data[key]) {
     target.$$data[key] = []
   }
-  //  创建一个proto作为一个数组新原型，这个原型的push等方法经过改造
-  let proto = []
+  
   let descriptors = {
-    // 这些属性都是为了冒泡准备的，arra没有$set等设置相关的属性
-    $$key: { value: key },
-    $$parent: { value: target },
-    $$data: { value: target.$$data[key] },
+    $$key: { 
+      value: key,
+    },
+    $$parent: { 
+      value: target,
+    },
+    $$data: { 
+      value: target.$$data[key],
+    },
+    // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
+    $$listeners: {
+      value: [],
+    },
+    $$validators: {
+      value: [],
+    },
+    $dispatch: {
+      value: prototypes.$dispatch.bind(data),
+    },
+    $validate: {
+      value: prototypes.$validate.bind(data),
+    },
   }
+
   let methods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']
   methods.forEach((method) => {
     descriptors[method] = {
       value: function(...args) {
         // 这里注意：数组的这些方法没有校验逻辑，因为你不知道这些方法到底要对那个元素进行修改
         
-        let oldValue = valueOf(this)
+        let oldData = valueOf(target.$$data)
         
+        Array.prototype[method].call(target.$$data[key], ...args)
         Array.prototype[method].call(this, ...args)
+        // TODO: 根据不同类型的操作判断是否要重新xdefine
         this.forEach((item, i) => {
           // 调整元素的path信息，该元素的子元素path也会被调整
           xdefine(this, i , item)
         })
-
-        let newValue = valueOf(this)
-        target.$dispatch(key, newValue, oldValue)
+        
+        let newData = valueOf(target.$$data)
+        target.$dispatch(key, newData, oldData)
       }
     }
   })
+
   Object.defineProperties(proto, descriptors)
   // 用proto作为数组的原型
-  let data = []
   setProto(data, proto)
   value.forEach((item, i) => {
     xdefine(data, i, item)

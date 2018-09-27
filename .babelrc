@@ -1,5 +1,10 @@
 {
   "presets": [
     ["env", { "module": false }]
-  ]
+  ],
+  "env": {
+    "test": {
+      "presets": ["env"]
+    }
+  }
 }
