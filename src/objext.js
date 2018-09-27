@@ -365,18 +365,6 @@ export class Objext {
     propagate(this)
   }
   /**
-   * 基于当前视图，克隆出一个新视图
-   */
-  $clone() {
-    if (this.$$locked) {
-      return
-    }
-
-    let data = this.$$data
-    let value = valueOf(data)
-    return new Objext(value)
-  }
-  /**
    * 创建一个快照，使用reset可以恢复这个快照
    */
   $commit(tag) {
@@ -485,6 +473,14 @@ export class Objext {
     propagate(this)
 
     return result
+  }
+  /**
+   * 基于当前对象，克隆出一个新对象
+   */
+  $clone() {
+    let data = this.$$data
+    let value = valueOf(data)
+    return new Objext(value)
   }
   valueOf() {
     return valueOf(this.$$data)
