@@ -42,6 +42,8 @@ export class Objext {
     this.$define('$$data', {})
     this.$define('$$locked', false)
 
+    this.$define('$$inited', false) // 用来记录是否已经塞过数据了
+
     // 写入数据
     if (data) {
       this.$put(data)
@@ -137,10 +139,16 @@ export class Objext {
         this.$set(key, data[key])
       }
     })
+
     // 设置计算属性
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
     })
+    
+    // $$inited为true的情况下，才能进行依赖收集，否则不允许
+    // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误
+    this.$define('$$inited', true)
+
     // 依赖初始化值
     getters.forEach((item) => {
       this.$compute(item.key, item.getter)
@@ -162,6 +170,7 @@ export class Objext {
     
     let oldData = valueOf(this.$$data)
     xset(this, path, value)
+    
     let newData = valueOf(this.$$data)
     this.$dispatch(path, newData, oldData)
   }
@@ -208,11 +217,8 @@ export class Objext {
       },
     })
 
-    // 依赖收集，首次运行的时候，有些属性可能还没赋值上去，所以要用一个try包起来
-    try {
-      this.$compute(key, getter) 
-    }
-    catch(e) {}
+    // 依赖收集
+    this.$compute(key, getter) 
   }
   /**
    * 依赖收集
@@ -300,6 +306,10 @@ export class Objext {
    * @param {*} oldData this的老数据
    */
   $dispatch(path, newData, oldData) {
+    if (!this.$$inited) {
+      return
+    }
+
     if (this.$$locked) {
       return
     }
@@ -393,7 +403,7 @@ export class Objext {
 
     let data = null
     let snapshots = this.$$snapshots
-    for (let i = snapshots.length; i >= 0; i --) {
+    for (let i = snapshots.length - 1; i >= 0; i --) {
       let item = snapshots[i]
       if (item.tag === tag) {
         data = item.data
@@ -438,14 +448,14 @@ export class Objext {
    */
   $validate(path, data) {
     let result = null
-    let validators = this.$$validators.filter(item => path === undefined || item.path === path) // path不传的时候，校验全部验证规则
+    let validators = this.$$validators.filter(item => arguments.length === 0 || item.path === path) // path不传的时候，校验全部验证规则
     for (let i = 0, len = validators.length; i < len; i ++) {
       let item = validators[i]
       if (!isObject(item)) {
         continue
       }
       let { check, message, warn, path } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
-      let value = data || valueOf(parse(this.$$data, path))
+      let value = arguments.length < 2 ? valueOf(parse(this.$$data, path)) : data
       let bool = check(value)
       if (!bool) {
         let error = new Error(message)

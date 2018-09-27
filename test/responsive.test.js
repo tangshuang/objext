@@ -46,7 +46,7 @@ describe('测试数据响应', () => {
     objx.hobbits.basketball = false
   })
 
-  test('watch name', (done) => {
+  test('普通监听', (done) => {
     let objx = new Objext(origin)
     objx.$watch('name', (e, newValue, oldValue) => {
       expect(e.path).toBe('name')
@@ -57,7 +57,7 @@ describe('测试数据响应', () => {
     objx.name = 'tomi'
   })
 
-  test('watch hobbits deeply', (done) => {
+  test('深度监听', (done) => {
     let objx = new Objext(origin)
     objx.$watch('hobbits', (e, newValue, oldValue) => {
       expect(e.key).toBe('hobbits') // when deep watch, e.path will give the true final path, e.key will give the watch key
@@ -69,7 +69,7 @@ describe('测试数据响应', () => {
     objx.hobbits.football = true
   })
 
-  test('watch parents[1]', (done) => {
+  test('监听数组元素的变动', (done) => {
     let objx = new Objext(origin)
     objx.$watch('parents[1]', (e, newValue, oldValue) => {
       expect(e.path).toBe('parents[1]')
@@ -80,7 +80,7 @@ describe('测试数据响应', () => {
     objx.parents[1] = 'ximen'
   })
 
-  test('watch children[0].age', (done) => {
+  test('监听数组元素对象的子属性的变动', (done) => {
     let objx = new Objext(origin)
     objx.$watch('children[0].age', (e, newValue, oldValue) => {
       expect(e.path).toBe('children[0].age')
@@ -91,7 +91,7 @@ describe('测试数据响应', () => {
     objx.children[0].age = 7
   })
 
-  test('watch sex which depends on age', (done) => {
+  test('监听一个计算属性', (done) => {
     let objx = new Objext(origin)
     objx.$watch('sex', (e, newValue, oldValue) => {
       expect(e.path).toBe('sex')
@@ -102,7 +102,7 @@ describe('测试数据响应', () => {
     objx.age = 18
   })
 
-  test('watch healthy which depends on hobbits.swiming', (done) => {
+  test('监听一个依赖深层级属性值的计算属性', (done) => {
     let objx = new Objext(origin)
     objx.$watch('healthy', (e, newValue, oldValue) => {
       expect(e.path).toBe('healthy')
@@ -113,7 +113,7 @@ describe('测试数据响应', () => {
     objx.hobbits.swiming = false
   })
 
-  test('watch think.it which denpends on think.size', (done) => {
+  test('监听一个深层级的计算属性', (done) => {
     let objx = new Objext(origin)
     objx.$watch('think.it', (e, newValue, oldValue) => {
       expect(e.path).toBe('think.it')

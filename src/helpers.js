@@ -116,9 +116,14 @@ export function xobject(value, key, target) {
   if (!target.$$data[key]) {
     target.$$data[key] = {}
   }
+
   Object.defineProperty(objx, '$$data', {
     configurable: true,
     get: () => target.$$data[key],
+  })
+  Object.defineProperty(objx, '$$locked', {
+    configurable: true,
+    get: () => target.$$locked,
   })
   
   objx.$put(value)
@@ -147,11 +152,17 @@ export function xarray(value, key, target) {
       value: target.$$data[key],
     },
     // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
+    $$locked: {
+      get: () => target.$$locked,
+    },
     $$listeners: {
       value: [],
     },
     $$validators: {
       value: [],
+    },
+    $$inited: {
+      value: true,
     },
     $dispatch: {
       value: prototypes.$dispatch.bind(data),
@@ -165,6 +176,10 @@ export function xarray(value, key, target) {
   methods.forEach((method) => {
     descriptors[method] = {
       value: function(...args) {
+        if (target.$$locked) {
+          return
+        }
+
         // 这里注意：数组的这些方法没有校验逻辑，因为你不知道这些方法到底要对那个元素进行修改
         
         let oldData = valueOf(target.$$data)

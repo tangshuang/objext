@@ -250,7 +250,7 @@ export function unionArray(a, b) {
  * @param {*} obj 
  */
 export function inheritOf(obj) {
-  if (!isObject(obj) || !isArray(obj)) {
+  if (!isObject(obj) && !isArray(obj)) {
     return obj
   }
   let result = isArray(obj) ? [] : {}
