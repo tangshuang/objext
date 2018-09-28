@@ -183,20 +183,24 @@ export class Objext {
       return
     }
 
+    if (!this.$has(path)) {
+      return
+    }
+
     let chain = makeKeyChain(path)
     let key = chain.pop()
     let oldData = valueOf(this.$$data)
 
     if (!chain.length) {
       delete this[key]
-      delete this.$$data[key]
+      this.$$data[key] = undefined // 不能直接delete，因为$$data是原型链继承的，如果delete掉，读取时会读取原型链上的值
     }
     else {
       let target = makeKeyPath(chain)
-      let node = parse(this.$$data, target)
+      let data = parse(this.$$data, target)
+      let node = parse(this, target)
+      data[key] = undefined
       delete node[key]
-      let $node = parse(this, target)
-      delete $node[key]
     }
 
     let newData = valueOf(this.$$data)
@@ -258,7 +262,7 @@ export class Objext {
    * @param {*} key
    */
   $has(path) {
-    let target = this.$$data // 因为依赖收集里面要用到$has，如果这里直接用this的话，会导致死循环
+    let target = this
     let chain = makeKeyChain(path)
 
     for (let i = 0, len = chain.length; i < len; i ++) {
