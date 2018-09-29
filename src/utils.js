@@ -1,7 +1,7 @@
 /**
  * 浅遍历对象
- * @param {*} data 
- * @param {*} fn 
+ * @param {*} data
+ * @param {*} fn
  */
 export function each(data, fn) {
   let keys = Object.keys(data)
@@ -10,8 +10,8 @@ export function each(data, fn) {
 
 /**
  * 深遍历对象
- * @param {*} data 
- * @param {*} fn 
+ * @param {*} data
+ * @param {*} fn
  */
 export function traverse(data, fn) {
   let traverse = (data, path = '') => {
@@ -54,9 +54,9 @@ export function makeKeyPath(chain) {
 
 /**
  * 根据keyPath读取对象属性值
- * @param {*} obj 
- * @param {*} path 
- * @example 
+ * @param {*} obj
+ * @param {*} path
+ * @example
  * parse({ child: [ { body: { head: true } } ] }, 'child[0].body.head') => true
  */
 export function parse(obj, path) {
@@ -79,15 +79,15 @@ export function parse(obj, path) {
 
 /**
  * 根据keyPath设置对象的属性值
- * @param {*} obj 
- * @param {*} path 
- * @param {*} value 
+ * @param {*} obj
+ * @param {*} path
+ * @param {*} value
  * @example
  * assign({}, 'body.head', true) => { body: { head: true } }
  */
 export function assign(obj, path, value) {
   let chain = makeKeyChain(path)
-  
+
   if (!chain.length) {
     return obj
   }
@@ -120,7 +120,7 @@ export function assign(obj, path, value) {
 
 /**
  * 深克隆一个对象
- * @param {*} obj 
+ * @param {*} obj
  */
 export function clone(obj) {
   let parents = []
@@ -157,7 +157,7 @@ export function clone(obj) {
 
 export function isArray(arr) {
   return Array.isArray(arr)
-} 
+}
 
 export function isFunction(fn) {
   return typeof fn === 'function'
@@ -236,9 +236,9 @@ export function isEqual(val1, val2) {
 
 /**
  * 求数组的并集
- * @param {*} a 
- * @param {*} b 
- * @example 
+ * @param {*} a
+ * @param {*} b
+ * @example
  * unionArray([1, 2], [1, 3]) => [1, 2, 3]
  */
 export function unionArray(a, b) {
@@ -247,7 +247,7 @@ export function unionArray(a, b) {
 
 /**
  * 以某个对象作为原型创建一个对象
- * @param {*} obj 
+ * @param {*} obj
  */
 export function inheritOf(obj) {
   if (!isObject(obj) && !isArray(obj)) {
@@ -266,7 +266,7 @@ export function inheritOf(obj) {
 
 /**
  * 获取一个复杂结构对象的字面量值，它会同时读取原型链上的可枚举值
- * @param {*} obj 
+ * @param {*} obj
  */
 export function valueOf(obj) {
   if (obj && typeof obj === 'object') {
@@ -289,8 +289,8 @@ export function valueOf(obj) {
 
 /**
  * 重新设置对象的原型为proto
- * @param {*} obj 
- * @param {*} proto 
+ * @param {*} obj
+ * @param {*} proto
  */
 export function setProto(obj, proto) {
   if (Object.setPrototypeOf) {
@@ -361,7 +361,7 @@ export function getStringHashcode(str) {
   return hash >>> 0
 }
 
-export default function getObjectHashcode(obj) {
+export function getObjectHashcode(obj) {
   let o = stringify(obj)
   let n = JSON.parse(o)
   let m = sort(n)

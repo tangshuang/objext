@@ -1,21 +1,25 @@
 <!DOCTYPE html>
 <title>测试计算属性</title>
 
-<script src="../obsx.js"></script>
+<script src="../dist/objext.js"></script>
 <script>
-var origin = {
+const { Objext } = window.objext
+const origin = {
   name: 'tomy',
   age: 10,
   get info() {
     return this.name + ' ' + this.age
   },
 }
-var objx = new Obsx(origin)
+const objx = new Objext(origin)
 
-console.log(objx)
 // 获取
 console.log(objx.info)
 
+// 监听
+objx.$watch('info', () => {})
+
+// 改变依赖
 objx.age = 11
 console.log(objx.info)
 </script>

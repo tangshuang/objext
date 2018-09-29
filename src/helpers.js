@@ -8,7 +8,6 @@ import {
   makeKeyChain,
   assign,
   parse,
-  each,
   isEqual,
 } from './utils'
 
@@ -34,7 +33,7 @@ export function xset(target, path, value) {
   }
 
   xdefine(node, key, value)
-  
+
   let data = target.$$data
   let oldValue = parse(data, path)
   if (!isEqual(oldValue, value)) {
@@ -52,7 +51,7 @@ export function xdefine(target, key, value) {
       if (target.$$locked) {
         return
       }
-      
+
       // 校验数据
       // 会冒泡上去
       target.$validate(key, v)
@@ -125,7 +124,7 @@ export function xobject(value, key, target) {
     configurable: true,
     get: () => target.$$locked,
   })
-  
+
   objx.$put(value)
 
   return objx
@@ -140,15 +139,15 @@ export function xarray(value, key, target) {
   if (!target.$$data[key]) {
     target.$$data[key] = []
   }
-  
+
   let descriptors = {
-    $$key: { 
+    $$key: {
       value: key,
     },
-    $$parent: { 
+    $$parent: {
       value: target,
     },
-    $$data: { 
+    $$data: {
       value: target.$$data[key],
     },
     // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
@@ -181,9 +180,9 @@ export function xarray(value, key, target) {
         }
 
         // 这里注意：数组的这些方法没有校验逻辑，因为你不知道这些方法到底要对那个元素进行修改
-        
+
         let oldData = valueOf(target.$$data)
-        
+
         Array.prototype[method].call(target.$$data[key], ...args)
         Array.prototype[method].call(this, ...args)
         // TODO: 根据不同类型的操作判断是否要重新xdefine
@@ -191,7 +190,7 @@ export function xarray(value, key, target) {
           // 调整元素的path信息，该元素的子元素path也会被调整
           xdefine(this, i , item)
         })
-        
+
         let newData = valueOf(target.$$data)
         target.$dispatch(key, newData, oldData)
       }

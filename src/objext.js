@@ -1,14 +1,8 @@
 import {
-  isArray,
   isEqual,
   isFunction,
-  isInstanceOf,
   isObject,
   inObject,
-  unionArray,
-  isEmpty,
-  each,
-  traverse,
   makeKeyPath,
   makeKeyChain,
   parse,
@@ -16,14 +10,9 @@ import {
   clone,
   inheritOf,
   valueOf,
-  setProto,
   getStringHashcode,
 } from './utils'
 import {
-  xcreate,
-  xarray,
-  xobject,
-  xdefine,
   xset,
 } from './helpers'
 
@@ -32,13 +21,13 @@ export class Objext {
     this.$define('$$snapshots', [])
     this.$define('$$validators', [])
     this.$define('$$listeners', [])
-    
+
     this.$define('$$dep', {})
     this.$define('$$deps', [])
-    
+
     this.$define('$$parent', null)
     this.$define('$$key', '')
-    
+
     this.$define('$$data', {})
     this.$define('$$locked', false)
 
@@ -51,8 +40,8 @@ export class Objext {
   }
   /**
    * 在试图上设置一个不可枚举属性
-   * @param {*} key 
-   * @param {*} value 
+   * @param {*} key
+   * @param {*} value
    */
   $define(key, value) {
     Object.defineProperty(this, key, { value, configurable: true })
@@ -69,7 +58,7 @@ export class Objext {
   }
   /**
    * 获取当前节点的完整路径
-   * @param {*} prop 
+   * @param {*} prop
    */
   get $$path() {
     let key = this.$$key
@@ -144,7 +133,7 @@ export class Objext {
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
     })
-    
+
     // $$inited为true的情况下，才能进行依赖收集，否则不允许
     // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误
     this.$define('$$inited', true)
@@ -167,16 +156,16 @@ export class Objext {
     // 数据校验
     // 校验过程不中断下方的赋值，如果想要中断，可以在warn里面使用throw new Error
     this.$validate(path, value)
-    
+
     let oldData = valueOf(this.$$data)
     xset(this, path, value)
-    
+
     let newData = valueOf(this.$$data)
     this.$dispatch(path, newData, oldData)
   }
   /**
    * 移除一个属性，不能直接用delete obj.prop这样的操作，否则不能同步内部数据，不能触发$dispatch
-   * @param {*} path 
+   * @param {*} path
    */
   $remove(path) {
     if (this.$$locked) {
@@ -208,21 +197,21 @@ export class Objext {
   }
   /**
    * 设置一个计算属性
-   * @param {*} key 
-   * @param {*} getter 
+   * @param {*} key
+   * @param {*} getter
    */
   $describe(key, getter) {
     Object.defineProperty(this, key, {
       configurable: true,
       enumerable : true,
-      get: () => {  
+      get: () => {
         let value = parse(this.$$data, key)
         return value
       },
     })
 
     // 依赖收集
-    this.$compute(key, getter) 
+    this.$compute(key, getter)
   }
   /**
    * 依赖收集
@@ -305,7 +294,7 @@ export class Objext {
   }
   /**
    * 触发watchers，注意，newData和oldData不是path对应的值，而是整个objx的值，在watcher的回调函数中，得到的是wathcher自己的path对应的值
-   * @param {*} path 
+   * @param {*} path
    * @param {*} newData this的新数据
    * @param {*} oldData this的老数据
    */
@@ -323,25 +312,28 @@ export class Objext {
     let pipeline = true
     let stopPropagation = () => propagation = false
     let preventDefault = () => pipeline = false
-    let e = {}
 
-    Object.defineProperties(e, {
-      path: { value: path },
-      target: { value: this },
-      stopPropagation: { value: stopPropagation },
-      preventDefault: { value: preventDefault },
-    })
 
     for (let i = 0, len = listeners.length; i < len; i ++) {
       let item = listeners[i]
-      e.key = item.path
-      e.type = item.deep ? 'deep' : 'shallow'
-
       let targetPath = item.path === '*' ? '' : item.path
       let newValue = parse(newData, targetPath)
       let oldValue = parse(oldData, targetPath)
+      let e = {}
+
+      Object.defineProperties(e, {
+        key: { value: item.path },
+        type: { value: item.deep ? 'deep' : 'shallow' },
+        path: { value: path },
+        target: { value: this },
+        newValue: { value: newValue },
+        oldValue: { value: oldValue },
+        stopPropagation: { value: stopPropagation },
+        preventDefault: { value: preventDefault },
+      })
+
       item.fn(e, newValue, oldValue)
-      
+
       // 阻止继续执行其他listener
       if (!pipeline) {
         break
@@ -405,7 +397,7 @@ export class Objext {
     if (!data) {
       return
     }
-    
+
     let next = inheritOf(data)
     this.$define('$$data', next)
     let value = valueOf(data)

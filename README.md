@@ -29,7 +29,7 @@ const { Objext } = require('objext')
 ```html
 <script src="objext/dist/objext.js"></script>
 <script>
-const { Objext } = window.objext 
+const { Objext } = window.objext
 </script>
 ```
 
@@ -76,7 +76,7 @@ objx.$set('body.head.hair', 'black')
 // => { body: { head: { hair: 'black' } } }
 ```
 
-更重要的是，只有通过$set方法，才能让一个属性具备可响应式能力。比如你直接objx.feet = 2，feet这个属性不是响应式的，你不能用$watch去监听它。但是你objx.$set('feet', 2)之后，它就是响应式了。
+更重要的是，只有通过$set方法，才能让一个属性具备可响应式能力。比如你直接objx.feet = 2，feet这个属性不是响应式的，你不能用$watch去监听它。但是你objx.$set('feet', 2)之后，它就是响应式了。也就是说，必须用$set来添加属性，而不能直接像object属性赋值一样。
 
 ### $remove(keyPath)
 
@@ -92,7 +92,7 @@ Objext创建到对象是响应式的，和vue的那种模式一样，当一个�
 
 ```js
 objx.$watch('body.head.hair', (e, newValue, oldValue) => {
-  // e: 包含一些信息，你可以用来进行判断 
+  // e: 包含一些信息，你可以用来进行判断
   // newValue: 新值
   // oldValue: 老值
   // 任何对body.head.hair的修改都会触发callback，即使newValue===oldValue，因此，你必须在callback里面自己做逻辑去判断是否要执行一些代码
@@ -101,12 +101,21 @@ objx.$watch('body.head.hair', (e, newValue, oldValue) => {
 
 我们看下e里面都有些什么：
 
+- oldValue: 老数据
+- newValue: 新数据
 - path: 被修改的属性的path信息
 - key: watch的第一个参数
 - target: 被监听到的属性所属的对象
 - preventDefault(): 放弃剩下的所有监听回调
 - stopPropagation(): 禁止冒泡，Objext的监听采取冒泡模式，当一个节点的属性发生变化时，先是这个节点的watcher被激活，然后往它的父级不断广播，直到最顶层
 
+如果你嫌麻烦，可以这样做更舒服：
+
+```js
+objx.$watch('body.head.hair', ({ oldValue, newValue }) => {
+  // 这样更舒服吧
+})
+```
 
 **deep**
 
@@ -160,9 +169,10 @@ console.log(objx.name) // => 'tomy'
 
 ## 数据校验
 
-通过设置校验器，可以对数据进行校验。它有两种校验方式，一种是在使用$set修改/添加属性的时候，另外一种是直接调用$validate方法，对整个数据进行全量校验。
+通过设置校验器，可以对数据进行校验。它有两种校验方式，一种是在使用修改/$set添加属性的时候，另外一种是直接调用$validate方法，对整个数据进行全量校验。
 
-这里需要注意的是，通过手动修改/赋值属性，是不能触发校验的，校验只有在使用$set时被使用。
+这里需要注意的是，通过手动添加属性，是不能触发校验的，校验只有在使用$set进行添加属性时被使用。
+其实，实际上，必须用$set来添加属性。
 
 还有一点是，校验是后置的，也就是说，你无法在实例化时校验初始数据。
 
