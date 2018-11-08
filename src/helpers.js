@@ -75,13 +75,13 @@ export function xdefine(target, key, value) {
     get() {
       /**
        * 这里需要详细解释一下
-       * 由于依赖收集中$$dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
+       * 由于依赖收集中$$__dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
        * 但是，由于在进行监听时，deep为true，因此，即使是只有顶层属性被监听，当顶层属性的深级属性变动时，这个监听也会被触发，因此也能带来依赖响应
        */
-      if (target.$$dep && target.$$dep.key && target.$$dep.getter) {
-        target.$$dep.dependency = key
-        target.$$dep.target = target
-        target.$collect()
+      if (target.$$__dep && target.$$__dep.key && target.$$__dep.getter) {
+        target.$$__dep.dependency = key
+        target.$$__dep.target = target
+        target.$__collect()
       }
 
       return $$
@@ -160,14 +160,14 @@ export function xarray(value, key, target) {
     $$validators: {
       value: [],
     },
-    $$inited: {
-      value: true,
-    },
     $dispatch: {
       value: prototypes.$dispatch.bind(data),
     },
     $validate: {
       value: prototypes.$validate.bind(data),
+    },
+    $$__inited: {
+      value: true,
     },
   }
 

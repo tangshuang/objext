@@ -22,8 +22,8 @@ export class Objext {
     this.$define('$$validators', [])
     this.$define('$$listeners', [])
 
-    this.$define('$$dep', {})
-    this.$define('$$deps', [])
+    this.$define('$$__dep', {})
+    this.$define('$$__deps', [])
 
     this.$define('$$parent', null)
     this.$define('$$key', '')
@@ -31,7 +31,8 @@ export class Objext {
     this.$define('$$data', {})
     this.$define('$$locked', false)
 
-    this.$define('$$inited', false) // 用来记录是否已经塞过数据了
+    this.$define('$$__inited', false) // 用来记录是否已经塞过数据了
+    this.$define('$$__putting', false) // 用来标记是否要进行全量更新
 
     // 写入数据
     if (data) {
@@ -98,6 +99,9 @@ export class Objext {
       return
     }
 
+    // 全量更新
+    this.$define('$$__putting', true)
+
     // 先把当前视图的所有数据删掉
     let keys = Object.keys(this)
     let current = this.$$data
@@ -107,7 +111,10 @@ export class Objext {
     })
     this.$update(data)
 
+    // 更新hash
     this.$define('$$hash', getStringHashcode(this.toString()))
+    // 重置全量更新
+    this.$define('$$__putting', false)
   }
   /**
    * 增量更新数据
@@ -138,13 +145,13 @@ export class Objext {
       this.$describe(item.key, item.getter)
     })
 
-    // $$inited为true的情况下，才能进行依赖收集，否则不允许
+    // $$__inited为true的情况下，才能进行依赖收集，否则不允许
     // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误
-    this.$define('$$inited', true)
+    this.$define('$$__inited', true)
 
     // 依赖初始化值
     getters.forEach((item) => {
-      this.$compute(item.key, item.getter)
+      this.$__compute(item.key, item.getter)
     })
   }
   /**
@@ -164,6 +171,7 @@ export class Objext {
     let oldData = valueOf(this.$$data)
     xset(this, path, value)
 
+    // 触发watch绑定的回调函数
     let newData = valueOf(this.$$data)
     this.$dispatch(path, newData, oldData)
   }
@@ -215,39 +223,39 @@ export class Objext {
     })
 
     // 依赖收集
-    this.$compute(key, getter)
+    this.$__compute(key, getter)
   }
   /**
    * 依赖收集
    */
-  $collect() {
-    let { getter, key, dependency, target } = this.$$dep
+  $__collect() {
+    let { getter, key, dependency, target } = this.$$__dep
 
-    if (this.$$deps.find(item => item.key === key && item.dependency === dependency)) {
+    if (this.$$__deps.find(item => item.key === key && item.dependency === dependency)) {
       return false
     }
     let callback = () => {
       let oldData = valueOf(this.$$data)
-      this.$compute(key, getter)
+      this.$__compute(key, getter)
       let newData = valueOf(this.$$data)
       this.$dispatch(key, newData, oldData)
     }
-    this.$$deps.push({ key, dependency })
+    this.$$__deps.push({ key, dependency })
     target.$watch(dependency, callback, true)
     return true
   }
   /**
    * 依赖计算赋值
    */
-  $compute(key, getter) {
-    this.$define('$$dep', { key, getter })
+  $__compute(key, getter) {
+    this.$define('$$__dep', { key, getter })
     let data = this.$$data
     let oldValue = parse(data, key)
     let newValue = getter.call(this)
     if (!isEqual(oldValue, newValue)) {
       assign(data, key, newValue)
     }
-    this.$define('$$dep', {})
+    this.$define('$$__dep', {})
     return newValue
   }
   /**
@@ -303,11 +311,16 @@ export class Objext {
    * @param {*} oldData this的老数据
    */
   $dispatch(path, newData, oldData) {
-    if (!this.$$inited) {
+    if (!this.$$__inited) {
       return
     }
 
     if (this.$$locked) {
+      return
+    }
+
+    // 当用$put进行全量更新时，不进行dispatch
+    if (this.$$__putting) {
       return
     }
 

@@ -117,6 +117,8 @@ objx.$watch('body.head.hair', ({ oldValue, newValue }) => {
 })
 ```
 
+需要注意的是，使用`$put`方法全量更新数据时，不会触发任何watcher。
+
 **deep**
 
 当第三个参数deep设置为true的时候，表示深度观察，它的深层级节点发生变动的时候也能监听到。
