@@ -37,6 +37,13 @@ export class Objext {
     if (data) {
       this.$put(data)
     }
+
+    // 每当值发生变化时，hash被更新
+    this.$watch('*', ({ newValue, oldValue }) => {
+      if (!isEqual(newValue, oldValue)) {
+        this.$define('$$hash', getStringHashcode(this.toString()))
+      }
+    })
   }
   /**
    * 在试图上设置一个不可枚举属性
@@ -75,11 +82,6 @@ export class Objext {
 
     return makeKeyPath(chain)
   }
-  get $$hash() {
-    let data = this.toString()
-    let hash = getStringHashcode(data)
-    return hash
-  }
   /**
    * 获取key对应的值
    * @param {*} key
@@ -104,6 +106,8 @@ export class Objext {
       delete this[key]
     })
     this.$update(data)
+
+    this.$define('$$hash', getStringHashcode(this.toString()))
   }
   /**
    * 增量更新数据
