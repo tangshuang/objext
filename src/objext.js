@@ -34,6 +34,9 @@ export class Objext {
     this.$define('$$__inited', false) // 用来记录是否已经塞过数据了
     this.$define('$$__putting', false) // 用来标记是否要进行全量更新
 
+    this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
+    this.$define('$$__batch', []) // 用来记录批量一次更新的内容
+
     // 写入数据
     if (data) {
       this.$put(data)
@@ -127,6 +130,8 @@ export class Objext {
 
     let keys = Object.keys(data)
     let getters = []
+
+    this.$batchStart()
     keys.forEach((key) => {
       let descriptor = Object.getOwnPropertyDescriptor(data, key)
       if (descriptor.get) {
@@ -139,6 +144,7 @@ export class Objext {
         this.$set(key, data[key])
       }
     })
+    this.$batchEnd()
 
     // 设置计算属性
     getters.forEach((item) => {
@@ -171,9 +177,38 @@ export class Objext {
     let oldData = valueOf(this.$$data)
     xset(this, path, value)
 
-    // 触发watch绑定的回调函数
     let newData = valueOf(this.$$data)
-    this.$dispatch(path, newData, oldData)
+    // 收集批量修改过程中的的变动
+    if (this.$$__isBatchUpdate) {
+      this.$$__batch.push({ path, newData, oldData })
+    }
+    // 触发watch绑定的回调函数
+    else {
+      this.$dispatch(path, newData, oldData)
+    }
+  }
+  $batchStart() {
+    this.$define('$$__isBatchUpdate', true)
+  }
+  $batchEnd() {
+    // 把收集到的变动集中起来，去重，得到最小集
+    let batch = {}
+    this.$$__batch.forEach(({ path, newData, oldData }) => {
+      batch[path] = {
+        path,
+        newData,
+      }
+      // 对于老数据，只用最开始那个，后面的oldData其实都不是真正的oldData
+      if (typeof batch[path].oldData === 'undefined') {
+        batch[path].oldData = oldData
+      }
+    })
+    let list = Object.values(batch)
+    list.forEach(({ path, newData, oldData }) => this.$dispatch({ path, newData, oldData }))
+
+    // 重置信息
+    this.$$__batch.length = 0
+    this.$define('$$__isBatchUpdate', false)
   }
   /**
    * 移除一个属性，不能直接用delete obj.prop这样的操作，否则不能同步内部数据，不能触发$dispatch

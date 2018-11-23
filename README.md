@@ -82,6 +82,33 @@ objx.$set('body.head.hair', 'black')
 
 用来移除某个属性，替代delete操作。
 
+### $put(data)
+
+全量更新。
+用data去替换现在objext内的所有数据。原有数据会被全部清除。但是注意，watch绑定的回调不会被清除。
+
+### $update(data)
+
+增量更新。
+批量更新data，如果data中的某个属性不存在，则增加这个属性的数据。
+它不会删除任何数据，只会让数据更新或增加。
+
+注意：$update和$put也会触发watch的东西，但是，它们是一次性触发的，在全部数据修改完之后，才会触发watch回调，而非每次修改一个属性就被触发。
+
+### $batchStart() / $batchEnd()
+
+开启一个批量更新任务，开启之后，在调用$batchEnd之前，任何$set都不会触发watch回调，直到$batchEnd被调用时，所有收集到的watch才会一次性执行所有回调。
+
+```js
+objx.$batchStart()
+objx.$set('body.main', 'left')
+objx.$set('name', 'ceci')
+objx.$set('body.main', 'right')
+objx.$batchEnd()
+```
+
+上面的代码中，执行了多次$set，但是，所有的变动的回调会在$batchEnd的时候才执行，每一个属性对应的回调只会执行一次，因此body.main的变动会被视为一次，最终的新值是right，它的回调只会执行一次。
+
 ## 响应式数据
 
 Objext创建到对象是响应式的，和vue的那种模式一样，当一个属性发生变化时，是可以被监测到的。
