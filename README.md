@@ -93,21 +93,7 @@ objx.$set('body.head.hair', 'black')
 批量更新data，如果data中的某个属性不存在，则增加这个属性的数据。
 它不会删除任何数据，只会让数据更新或增加。
 
-注意：$update和$put也会触发watch的东西，但是，它们是一次性触发的，在全部数据修改完之后，才会触发watch回调，而非每次修改一个属性就被触发。
-
-### $batchStart() / $batchEnd()
-
-开启一个批量更新任务，开启之后，在调用$batchEnd之前，任何$set都不会触发watch回调，直到$batchEnd被调用时，所有收集到的watch才会一次性执行所有回调。
-
-```js
-objx.$batchStart()
-objx.$set('body.main', 'left')
-objx.$set('name', 'ceci')
-objx.$set('body.main', 'right')
-objx.$batchEnd()
-```
-
-上面的代码中，执行了多次$set，但是，所有的变动的回调会在$batchEnd的时候才执行，每一个属性对应的回调只会执行一次，因此body.main的变动会被视为一次，最终的新值是right，它的回调只会执行一次。
+注意：$update和$put也会触发watch的东西，但是，它们是一次性触发的，在全部数据修改完之后，才会触发watch回调，而非每次修改一个属性就被触发。具体可以阅读下方的$batchStart/$batchEnd
 
 ## 响应式数据
 
@@ -251,7 +237,21 @@ console.log(objx.name) // => 'tomy'
 
 ## 其他
 
-另外，为了更方便的获取对象的信息，Objext提供了几个更便捷的方法。
+另外，为了更方便的获取对象的信息，Objext提供了几个方法。
+
+### $batchStart() / $batchEnd()
+
+开启一个批量更新任务，开启之后，在调用$batchEnd之前，任何$set都不会触发watch回调，直到$batchEnd被调用时，所有收集到的watch才会一次性执行所有回调。
+
+```js
+objx.$batchStart()
+objx.$set('body.main', 'left')
+objx.$set('name', 'ceci')
+objx.$set('body.main', 'right')
+objx.$batchEnd()
+```
+
+上面的代码中，执行了多次$set，但是，所有的变动的回调会在$batchEnd的时候才执行，每一个属性对应的回调只会执行一次，因此body.main的变动会被视为一次，最终的新值是right，它的回调只会执行一次。
 
 ### $clone()
 
