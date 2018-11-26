@@ -66,6 +66,8 @@ keyPath是指获取一个属性节点的路径，例如获取objx.body.head.hair
 
 和普通对象不同的是，通过$get方法，可以直接用keyPath读取一个属性。用$get方法的好处是，不用担心你去获取一个undefined的属性的子属性，举个例子，objx.body为undefined，那么，你在读取objx.body.head的时候，就会报错。但是用objx.$get('body.head')就可以避免这个问题。
 
+注意：$get得到的结果，是objext数据的一份拷贝，对该结果进行任何操作，都不会影响objext的当前数据。而且，还要考虑计算属性的问题，get得到的结果，会把计算属性转化为值，从而丢失计算的特性。
+
 ### $set(keyPath, value)
 
 和$get的好处一样，普通对象你不能读取一个undefined属性的子属性，更别提给它赋值。而$set就可以做到，它可以为一个不存在的深层次的属性进行赋值：
@@ -238,6 +240,10 @@ console.log(objx.name) // => 'tomy'
 ## 其他
 
 另外，为了更方便的获取对象的信息，Objext提供了几个方法。
+
+### $slient(is)
+
+切换安静模式/响应式模式。is为true时，表示进入安静模式，所有的watchers都不会被触发。
 
 ### $batchStart() / $batchEnd()
 
