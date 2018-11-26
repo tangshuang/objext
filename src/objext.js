@@ -8,7 +8,6 @@ import {
   parse,
   assign,
   clone,
-  inheritOf,
   valueOf,
   getStringHashcode,
 } from './utils'
@@ -22,18 +21,19 @@ export class Objext {
     this.$define('$$validators', [])
     this.$define('$$listeners', [])
 
+    this.$define('$$data', {})
+    this.$define('$$hash', '')
+
+    this.$define('$$locked', false)
+    this.$define('$$slient', false)
+
     this.$define('$$__dep', {})
     this.$define('$$__deps', [])
 
-    this.$define('$$parent', null)
-    this.$define('$$key', '')
-
-    this.$define('$$data', {})
-    this.$define('$$locked', false)
+    this.$define('$$__parent', null)
+    this.$define('$$__key', '')
 
     this.$define('$$__inited', false) // 用来记录是否已经塞过数据了
-    this.$define('$$__putting', false) // 用来标记是否要进行全量更新
-
     this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$$__batch', []) // 用来记录批量一次更新的内容
 
@@ -49,8 +49,9 @@ export class Objext {
       }
     })
   }
+
   /**
-   * 在试图上设置一个不可枚举属性
+   * 设置一个不可枚举属性
    * @param {*} key
    * @param {*} value
    */
@@ -58,41 +59,97 @@ export class Objext {
     Object.defineProperty(this, key, { value, configurable: true })
   }
   /**
-   * 获取当前节点的根节点
+   * 设置一个不可枚举的计算属性
+   * @param {*} key
+   * @param {*} get
    */
-  get $$root() {
-    let root = this
-    while (root.$$parent) {
-      root = root.$$parent
-    }
-    return root
+  $enhance(key, get) {
+    Object.defineProperty(this, key, { get, configurable: true })
+  }
+
+  /**
+   * 获取key对应的值，该值是原始值的克隆，因此，即使被修改也无所谓
+   * @param {*} path
+   */
+  $get(path) {
+    return parse(this.valueOf(), path)
   }
   /**
-   * 获取当前节点的完整路径
-   * @param {*} prop
+   * 设置一个普通值属性
+   * @param {*} path
+   * @param {*} value
    */
-  get $$path() {
-    let key = this.$$key
-    let chain = [key]
-    while (this.$$parent) {
-      let key = this.$$parent.$$key
-      if (key) {
-        chain.unshift(key)
-      }
-      else {
-        break
-      }
+  $set(path, value) {
+    if (this.$$locked) {
+      return
     }
 
-    return makeKeyPath(chain)
+    // 数据校验
+    // 校验过程不中断下方的赋值，如果想要中断，可以在warn里面使用throw new Error
+    this.$validate(path, value)
+
+    let oldData = this.valueOf()
+
+    xset(this, path, value)
+
+    let newData = this.valueOf()
+
+    // 触发watch绑定的回调函数
+    // 注意，批量开启时，不会触发，触发逻辑都在dispatch方法中
+    this.$dispatch(path, newData, oldData)
   }
   /**
-   * 获取key对应的值
-   * @param {*} key
+   * 移除一个属性
+   * 不能直接用delete obj.prop这样的操作，否则不能同步内部数据，不能触发$dispatch
+   * @param {*} path
    */
-  $get(key) {
-    return parse(this, key)
+  $remove(path) {
+    if (this.$$locked) {
+      return
+    }
+
+    if (!this.$has(path)) {
+      return
+    }
+
+    let chain = makeKeyChain(path)
+    let key = chain.pop()
+    let oldData = this.valueOf()
+
+    if (!chain.length) {
+      delete this[key]
+      delete this.$$data[key]
+    }
+    else {
+      let target = makeKeyPath(chain)
+      let data = parse(this.$$data, target)
+      let node = parse(this, target)
+      delete data[key]
+      delete node[key]
+    }
+
+    let newData = this.valueOf()
+    this.$dispatch(path, newData, oldData)
   }
+  /**
+   * 判断一个key是否在当前数据中存在
+   * @param {*} path
+   */
+  $has(path) {
+    let target = this
+    let chain = makeKeyChain(path)
+
+    for (let i = 0, len = chain.length; i < len; i ++) {
+      let key = chain[i]
+      if (typeof target !== 'object' || !inObject(key, target)) {
+        return false
+      }
+      target = target[key]
+    }
+
+    return true
+  }
+
   /**
    * 全量更新数据，老数据会被删除
    * @param {*} data 要设置的数据
@@ -102,9 +159,6 @@ export class Objext {
       return
     }
 
-    // 全量更新
-    this.$define('$$__putting', true)
-
     // 先把当前视图的所有数据删掉
     let keys = Object.keys(this)
     let current = this.$$data
@@ -112,12 +166,12 @@ export class Objext {
       delete current[key]
       delete this[key]
     })
+
+    // 把数据塞进去
     this.$update(data)
 
     // 更新hash
     this.$define('$$hash', getStringHashcode(this.toString()))
-    // 重置全量更新
-    this.$define('$$__putting', false)
   }
   /**
    * 增量更新数据
@@ -132,6 +186,7 @@ export class Objext {
     let getters = []
 
     this.$batchStart()
+
     keys.forEach((key) => {
       let descriptor = Object.getOwnPropertyDescriptor(data, key)
       if (descriptor.get) {
@@ -144,15 +199,16 @@ export class Objext {
         this.$set(key, data[key])
       }
     })
-    this.$batchEnd()
 
     // 设置计算属性
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
     })
 
+    this.$batchEnd()
+
     // $$__inited为true的情况下，才能进行依赖收集，否则不允许
-    // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误
+    // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误，因此，必须将$$__inited设置为false，阻止计算属性初始化操作
     this.$define('$$__inited', true)
 
     // 依赖初始化值
@@ -160,88 +216,49 @@ export class Objext {
       this.$__compute(item.key, item.getter)
     })
   }
+
+
   /**
-   * 设置一个普通值属性
-   * @param {*} key
-   * @param {*} value
+   * 是否禁止触发watch回调，以安静模式更新数据
+   * @param {*} is 为true表示启用安静模式，执行完一些操作之后，要使用false关闭安静模式，否则永远都无法触发watch回调
    */
-  $set(path, value) {
-    if (this.$$locked) {
-      return
-    }
-
-    // 数据校验
-    // 校验过程不中断下方的赋值，如果想要中断，可以在warn里面使用throw new Error
-    this.$validate(path, value)
-
-    let oldData = valueOf(this.$$data)
-    xset(this, path, value)
-
-    let newData = valueOf(this.$$data)
-    // 收集批量修改过程中的的变动
-    if (this.$$__isBatchUpdate) {
-      this.$$__batch.push({ path, newData, oldData })
-    }
-    // 触发watch绑定的回调函数
-    else {
-      this.$dispatch(path, newData, oldData)
-    }
+  $slient(is) {
+    this.$define('$$slient', !!is)
   }
+  /**
+   * 开启批量更新模式
+   * 批量更新模式开启后，仅在执行batchEnd方法时才会触发watch回调，这样可以避免在一次批量操作中对同一个path进行了多次watch回调触发
+   */
   $batchStart() {
     this.$define('$$__isBatchUpdate', true)
   }
+  /**
+   * 结束批量更新模式
+   */
   $batchEnd() {
-    // 把收集到的变动集中起来，去重，得到最小集
-    let batch = {}
-    this.$$__batch.forEach(({ path, newData, oldData }) => {
-      batch[path] = {
-        path,
-        newData,
-      }
-      // 对于老数据，只用最开始那个，后面的oldData其实都不是真正的oldData
-      if (typeof batch[path].oldData === 'undefined') {
-        batch[path].oldData = oldData
-      }
-    })
-    let list = Object.values(batch)
-    list.forEach(({ path, newData, oldData }) => this.$dispatch({ path, newData, oldData }))
+    // 不再触发dispatch操作
+    if (!this.$$slient) {
+      // 把收集到的变动集中起来，去重，得到最小集
+      let batch = {}
+      this.$$__batch.forEach(({ path, newData, oldData }) => {
+        batch[path] = {
+          path,
+          newData,
+        }
+        // 对于老数据，只用最开始那个，后面的oldData其实都不是真正的oldData
+        if (typeof batch[path].oldData === 'undefined') {
+          batch[path].oldData = oldData
+        }
+      })
+      let list = Object.values(batch)
+      list.forEach(({ path, newData, oldData }) => this.$dispatch({ path, newData, oldData }))
+    }
 
     // 重置信息
     this.$$__batch.length = 0
     this.$define('$$__isBatchUpdate', false)
   }
-  /**
-   * 移除一个属性，不能直接用delete obj.prop这样的操作，否则不能同步内部数据，不能触发$dispatch
-   * @param {*} path
-   */
-  $remove(path) {
-    if (this.$$locked) {
-      return
-    }
 
-    if (!this.$has(path)) {
-      return
-    }
-
-    let chain = makeKeyChain(path)
-    let key = chain.pop()
-    let oldData = valueOf(this.$$data)
-
-    if (!chain.length) {
-      delete this[key]
-      this.$$data[key] = undefined // 不能直接delete，因为$$data是原型链继承的，如果delete掉，读取时会读取原型链上的值
-    }
-    else {
-      let target = makeKeyPath(chain)
-      let data = parse(this.$$data, target)
-      let node = parse(this, target)
-      data[key] = undefined
-      delete node[key]
-    }
-
-    let newData = valueOf(this.$$data)
-    this.$dispatch(path, newData, oldData)
-  }
   /**
    * 设置一个计算属性
    * @param {*} key
@@ -269,10 +286,11 @@ export class Objext {
     if (this.$$__deps.find(item => item.key === key && item.dependency === dependency)) {
       return false
     }
+
     let callback = () => {
-      let oldData = valueOf(this.$$data)
+      let oldData = this.valueOf()
       this.$__compute(key, getter)
-      let newData = valueOf(this.$$data)
+      let newData = this.valueOf()
       this.$dispatch(key, newData, oldData)
     }
     this.$$__deps.push({ key, dependency })
@@ -285,32 +303,18 @@ export class Objext {
   $__compute(key, getter) {
     this.$define('$$__dep', { key, getter })
     let data = this.$$data
-    let oldValue = parse(data, key)
     let newValue = getter.call(this)
-    if (!isEqual(oldValue, newValue)) {
-      assign(data, key, newValue)
-    }
+    assign(data, key, newValue)
     this.$define('$$__dep', {})
     return newValue
   }
+
   /**
-   * 判断一个key是否在当前dataview中存在
-   * @param {*} key
+   * 添加一个watch回调
+   * @param {*} path
+   * @param {*} fn
+   * @param {*} deep
    */
-  $has(path) {
-    let target = this
-    let chain = makeKeyChain(path)
-
-    for (let i = 0, len = chain.length; i < len; i ++) {
-      let key = chain[i]
-      if (typeof target !== 'object' || !inObject(key, target)) {
-        return false
-      }
-      target = target[key]
-    }
-
-    return true
-  }
   $watch(path, fn, deep) {
     if (this.$$locked) {
       return
@@ -324,6 +328,11 @@ export class Objext {
       deep,
     })
   }
+  /**
+   * 去除一个watch回调
+   * @param {*} path
+   * @param {*} fn
+   */
   $unwatch(path, fn) {
     if (this.$$locked) {
       return
@@ -340,7 +349,7 @@ export class Objext {
     indexes.forEach(i => this.$$listeners.splice(i, 1))
   }
   /**
-   * 触发watchers，注意，newData和oldData不是path对应的值，而是整个objx的值，在watcher的回调函数中，得到的是wathcher自己的path对应的值
+   * 触发watchers，注意，newData和oldData不是path对应的值，而是整个objx的值，通过path从它们中获取对应的值，在watcher的回调函数中，得到的是wathcher自己的path对应的值
    * @param {*} path
    * @param {*} newData this的新数据
    * @param {*} oldData this的老数据
@@ -354,8 +363,13 @@ export class Objext {
       return
     }
 
-    // 当用$put进行全量更新时，不进行dispatch
-    if (this.$$__putting) {
+    // 收集批量修改过程中的的变动
+    if (this.$$__isBatchUpdate) {
+      this.$$__batch.push({ path, newData, oldData })
+      return
+    }
+
+    if (this.$$slient) {
       return
     }
 
@@ -364,7 +378,6 @@ export class Objext {
     let pipeline = true
     let stopPropagation = () => propagation = false
     let preventDefault = () => pipeline = false
-
 
     for (let i = 0, len = listeners.length; i < len; i ++) {
       let item = listeners[i]
@@ -399,12 +412,12 @@ export class Objext {
 
     // 向上冒泡
     let propagate = (target) => {
-      let parent = target.$$parent
-      let key = target.$$key
+      let parent = target.$$__parent
+      let key = target.$$__key
       if (parent && parent.$dispatch) {
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
-        let parentNewData = valueOf(parent.$$data)
+        let parentNewData = parent.$$data
         let parentOldData = assign(clone(parentNewData), key, oldData)
         parent.$dispatch(finalPath, parentNewData, parentOldData)
         propagate(parent)
@@ -412,6 +425,7 @@ export class Objext {
     }
     propagate(this)
   }
+
   /**
    * 创建一个快照，使用reset可以恢复这个快照
    */
@@ -426,11 +440,11 @@ export class Objext {
       data,
     })
 
-    let next = inheritOf(data)
+    let next = clone(data)
     this.$define('$$data', next)
   }
   /**
-   * 取消编辑过程中的全部改动，将数据恢复到编辑开始时的内容
+   * 将数据恢复到快照的内容
    */
   $reset(tag) {
     if (this.$$locked) {
@@ -439,6 +453,7 @@ export class Objext {
 
     let data = null
     let snapshots = this.$$snapshots
+    // 从后往前找，之所以取最后一个，是为了防止commit两个相同的tag，如果出现这种情况，应该取后面的tag，而非前面一个
     for (let i = snapshots.length - 1; i >= 0; i --) {
       let item = snapshots[i]
       if (item.tag === tag) {
@@ -446,21 +461,29 @@ export class Objext {
         break
       }
     }
+
     if (!data) {
       return
     }
 
-    let next = inheritOf(data)
-    this.$define('$$data', next)
-    let value = valueOf(data)
-    this.$put(value)
+    let next = clone(data)
+    this.$define('$$data', data)
+    this.$put(next)
   }
+
+  /**
+   * 锁定数据，无法做任何操作
+   */
   $lock() {
     this.$define('$$locked', true)
   }
+  /**
+   * 解锁
+   */
   $unlock() {
     this.$define('$$locked', false)
   }
+
   /**
    * 设置校验器
    * @param {*} validators 格式如下：
@@ -479,7 +502,7 @@ export class Objext {
   /**
    * 校验数据
    * @param {*} path 可选，不传时校验所有规则
-   * @param {*} data 可选，用该值作为备选值校验，一般在设置值之前做校验时使用
+   * @param {*} data 可选，用该值作为备选值校验，在$set新值之前对该新值做校验时使用
    * @return {Error} 一个Error的实例，message是校验器中设置的，同时，它附带两个属性（value, path），并且它会被传给校验器中的warn函数
    */
   $validate(path, data) {
@@ -491,7 +514,7 @@ export class Objext {
         continue
       }
       let { check, message, warn, path } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
-      let value = arguments.length < 2 ? valueOf(parse(this.$$data, path)) : data
+      let value = arguments.length < 2 ? parse(this.$$data, path) : data
       let bool = check(value)
       if (!bool) {
         let error = new Error(message)
@@ -509,8 +532,8 @@ export class Objext {
 
     // 向上冒泡
     let propagate = (target) => {
-      let parent = target.$$parent
-      let key = target.$$key
+      let parent = target.$$__parent
+      let key = target.$$__key
       if (parent && parent.$validate) {
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
@@ -522,19 +545,19 @@ export class Objext {
 
     return result
   }
+
   /**
    * 基于当前对象，克隆出一个新对象
    */
   $clone() {
-    let data = this.$$data
-    let value = valueOf(data)
+    let value = this.$$data
     return new Objext(value)
   }
   valueOf() {
-    return valueOf(this.$$data)
+    return clone(this.$$data)
   }
   toString() {
-    return JSON.stringify(this.valueOf())
+    return JSON.stringify(this.$$data)
   }
 }
 

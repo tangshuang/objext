@@ -37,6 +37,7 @@ describe('测试通过keyPath获取/修改/删除数据', () => {
   test('通过keyPath删除一个属性', () => {
     let objx = new Objext(origin)
     expect(objx.hobbits.football).toBe(false)
+
     objx.$remove('hobbits.football')
     expect(objx.hobbits.football).toBe(undefined)
     expect(objx.$has('hobbits.football')).toBe(false)
