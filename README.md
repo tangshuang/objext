@@ -184,6 +184,10 @@ objx.$reset('version1')
 console.log(objx.name) // => 'tomy'
 ```
 
+### $revert(tag)
+
+删除名为tag的所有快照。
+
 ## 数据校验
 
 通过设置校验器，可以对数据进行校验。它有两种校验方式，一种是在使用修改/$set添加属性的时候，另外一种是直接调用$validate方法，对整个数据进行全量校验。

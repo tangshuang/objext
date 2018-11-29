@@ -81,7 +81,7 @@ export class Objext {
    */
   $set(path, value) {
     if (this.$$locked) {
-      return
+      return this
     }
 
     // 数据校验
@@ -97,6 +97,8 @@ export class Objext {
     // 触发watch绑定的回调函数
     // 注意，批量开启时，不会触发，触发逻辑都在dispatch方法中
     this.$dispatch(path, newData, oldData)
+
+    return this
   }
   /**
    * 移除一个属性
@@ -105,11 +107,11 @@ export class Objext {
    */
   $remove(path) {
     if (this.$$locked) {
-      return
+      return this
     }
 
     if (!this.$has(path)) {
-      return
+      return this
     }
 
     let chain = makeKeyChain(path)
@@ -130,6 +132,8 @@ export class Objext {
 
     let newData = this.valueOf()
     this.$dispatch(path, newData, oldData)
+
+    return this
   }
   /**
    * 判断一个key是否在当前数据中存在
@@ -156,7 +160,7 @@ export class Objext {
    */
   $put(data) {
     if (this.$$locked) {
-      return
+      return this
     }
 
     // 先把当前视图的所有数据删掉
@@ -172,6 +176,8 @@ export class Objext {
 
     // 更新hash
     this.$define('$$hash', getStringHashcode(this.toString()))
+
+    return this
   }
   /**
    * 增量更新数据
@@ -179,7 +185,7 @@ export class Objext {
    */
   $update(data) {
     if (this.$$locked) {
-      return
+      return this
     }
 
     let keys = Object.keys(data)
@@ -215,6 +221,8 @@ export class Objext {
     getters.forEach((item) => {
       this.$__compute(item.key, item.getter)
     })
+
+    return this
   }
 
 
@@ -224,6 +232,7 @@ export class Objext {
    */
   $slient(is) {
     this.$define('$$slient', !!is)
+    return this
   }
   /**
    * 开启批量更新模式
@@ -231,6 +240,7 @@ export class Objext {
    */
   $batchStart() {
     this.$define('$$__isBatchUpdate', true)
+    return this
   }
   /**
    * 结束批量更新模式
@@ -257,6 +267,7 @@ export class Objext {
     // 重置信息
     this.$$__batch.length = 0
     this.$define('$$__isBatchUpdate', false)
+    return this
   }
 
   /**
@@ -276,6 +287,7 @@ export class Objext {
 
     // 依赖收集
     this.$__compute(key, getter)
+    return this
   }
   /**
    * 依赖收集
@@ -316,10 +328,6 @@ export class Objext {
    * @param {*} deep
    */
   $watch(path, fn, deep) {
-    if (this.$$locked) {
-      return
-    }
-
     path = makeKeyPath(makeKeyChain(path))
 
     this.$$listeners.push({
@@ -327,6 +335,8 @@ export class Objext {
       fn,
       deep,
     })
+
+    return this
   }
   /**
    * 去除一个watch回调
@@ -334,10 +344,6 @@ export class Objext {
    * @param {*} fn
    */
   $unwatch(path, fn) {
-    if (this.$$locked) {
-      return
-    }
-
     let indexes = []
     this.$$listeners.forEach((item, i) => {
       if (item.path === path && item.fn === fn) {
@@ -347,6 +353,7 @@ export class Objext {
     // 从后往前删，不会出现问题
     indexes.reverse()
     indexes.forEach(i => this.$$listeners.splice(i, 1))
+    return this
   }
   /**
    * 触发watchers，注意，newData和oldData不是path对应的值，而是整个objx的值，通过path从它们中获取对应的值，在watcher的回调函数中，得到的是wathcher自己的path对应的值
@@ -356,21 +363,21 @@ export class Objext {
    */
   $dispatch(path, newData, oldData) {
     if (!this.$$__inited) {
-      return
+      return this
     }
 
     if (this.$$locked) {
-      return
+      return this
     }
 
     // 收集批量修改过程中的的变动
     if (this.$$__isBatchUpdate) {
       this.$$__batch.push({ path, newData, oldData })
-      return
+      return this
     }
 
     if (this.$$slient) {
-      return
+      return this
     }
 
     let listeners = this.$$listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0) || item.path === '*')
@@ -407,7 +414,7 @@ export class Objext {
 
     // 阻止冒泡
     if (!propagation) {
-      return
+      return this
     }
 
     // 向上冒泡
@@ -424,6 +431,8 @@ export class Objext {
       }
     }
     propagate(this)
+
+    return this
   }
 
   /**
@@ -431,7 +440,7 @@ export class Objext {
    */
   $commit(tag) {
     if (this.$$locked) {
-      return
+      return this
     }
 
     let data = this.$$data
@@ -442,33 +451,67 @@ export class Objext {
 
     let next = clone(data)
     this.$define('$$data', next)
+
+    return this
   }
   /**
    * 将数据恢复到快照的内容
    */
   $reset(tag) {
     if (this.$$locked) {
-      return
+      return this
     }
 
     let data = null
     let snapshots = this.$$snapshots
-    // 从后往前找，之所以取最后一个，是为了防止commit两个相同的tag，如果出现这种情况，应该取后面的tag，而非前面一个
-    for (let i = snapshots.length - 1; i >= 0; i --) {
-      let item = snapshots[i]
-      if (item.tag === tag) {
-        data = item.data
-        break
+
+    if (tag === undefined) {
+      data = snapshots[snapshots.length - 1]
+    }
+    else {
+      // 从后往前找，之所以取最后一个，是为了防止commit两个相同的tag，如果出现这种情况，应该取后面的tag，而非前面一个
+      for (let i = snapshots.length - 1; i >= 0; i --) {
+        let item = snapshots[i]
+        if (item.tag === tag) {
+          data = item.data
+          break
+        }
       }
     }
 
     if (!data) {
-      return
+      return this
     }
 
     let next = clone(data)
     this.$define('$$data', data)
     this.$put(next)
+
+    return this
+  }
+  /**
+   * 将对应tag的快照从缓存中移除。
+   * 注意，如果缓存中有多个相同tag的快照，它们会被同时移除。
+   * @param {*} tag
+   */
+  $revert(tag) {
+    if (this.$$locked) {
+      return this
+    }
+
+    let snapshots = this.$$snapshots
+    if (tag === undefined) {
+      snapshots.length = 0
+    }
+    else {
+      snapshots.forEach((item, i) => {
+        if (item.tag === tag) {
+          snapshots.splice(i, 1)
+        }
+      })
+    }
+
+    return this
   }
 
   /**
@@ -476,12 +519,14 @@ export class Objext {
    */
   $lock() {
     this.$define('$$locked', true)
+    return this
   }
   /**
    * 解锁
    */
   $unlock() {
     this.$define('$$locked', false)
+    return this
   }
 
   /**
@@ -498,6 +543,7 @@ export class Objext {
    */
   $formulate(validators) {
     validators.forEach(item => this.$$validators.push(item))
+    return this
   }
   /**
    * 校验数据
