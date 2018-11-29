@@ -369,3 +369,13 @@ export function getObjectHashcode(obj) {
   let hash = getStringHashcode(str)
   return hash
 }
+
+export function defineProperty(target, key, value, configurable = true) {
+  Object.defineProperty(target, key, { value, configurable })
+}
+export function defineProperties(target, options, configurable = true) {
+  let props = Object.keys(options)
+  props.forEach((prop) => {
+    defineProperty(target, prop, options[prop], configurable)
+  })
+}

@@ -8,8 +8,9 @@ import {
   parse,
   assign,
   clone,
-  valueOf,
   getStringHashcode,
+  defineProperty,
+  defineProperties,
 } from './utils'
 import {
   xset,
@@ -56,7 +57,7 @@ export class Objext {
    * @param {*} value
    */
   $define(key, value) {
-    Object.defineProperty(this, key, { value, configurable: true })
+    defineProperty(this, key, value)
   }
   /**
    * 设置一个不可枚举的计算属性
@@ -393,16 +394,17 @@ export class Objext {
       let oldValue = parse(oldData, targetPath)
       let e = {}
 
-      Object.defineProperties(e, {
-        key: { value: item.path },
-        type: { value: item.deep ? 'deep' : 'shallow' },
-        path: { value: path },
-        target: { value: this },
-        newValue: { value: newValue },
-        oldValue: { value: oldValue },
-        stopPropagation: { value: stopPropagation },
-        preventDefault: { value: preventDefault },
-      })
+      defineProperties(e, {
+        match: item.path,
+        deep: item.deep,
+        path,
+        target: this,
+        newValue,
+        oldValue,
+        stopPropagation,
+        preventDefault,
+        isEqual,
+      }, false)
 
       item.fn(e, newValue, oldValue)
 
