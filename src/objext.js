@@ -627,7 +627,7 @@ export class Objext {
     return valueOf(this.$$__data)
   }
   toString() {
-    return JSON.stringify(this.$$__data)
+    return JSON.stringify(this.valueOf())
   }
 }
 
