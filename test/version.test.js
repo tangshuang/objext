@@ -11,9 +11,9 @@ describe('测试对数据进行版本控制', () => {
 
   test('创建一个版本', () => {
     let objx = new Objext(origin)
-    expect(objx.$$snapshots).toHaveLength(0)
+    expect(objx.$$__snapshots).toHaveLength(0)
     objx.$commit('origin')
-    expect(objx.$$snapshots).toHaveLength(1)
+    expect(objx.$$__snapshots).toHaveLength(1)
   })
 
   test('恢复到一个版本', () => {

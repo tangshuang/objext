@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+
+<script src="../dist/objext.js"></script>
+<script>
+  const { Objext } = window.objext
+  const evt = new Event('xxx')
+  const objx1 = new Objext({
+    name: 'tomy',
+    age: 10,
+  })
+  const objx2 = new Objext({
+    id: 1,
+    objx: objx1,
+    evt,
+  })
+  console.log(objx2)
+  console.log(objx2.valueOf())
+</script>

@@ -40,7 +40,7 @@ describe('测试数据响应', () => {
   test('监听任何变动，有任何变动时都会触发', (done) => {
     let objx = new Objext(origin)
     objx.$watch('*', (e) => {
-      expect(e.key).toBe('*')
+      expect(e.match).toBe('*')
       done()
     })
     objx.hobbits.basketball = false
@@ -60,8 +60,8 @@ describe('测试数据响应', () => {
   test('深度监听', (done) => {
     let objx = new Objext(origin)
     objx.$watch('hobbits', (e, newValue, oldValue) => {
-      expect(e.key).toBe('hobbits') // when deep watch, e.path will give the true final path, e.key will give the watch key
-      expect(e.type).toBe('deep')
+      expect(e.match).toBe('hobbits') // when deep watch, e.path will give the true final path, e.key will give the watch key
+      expect(e.deep).toBe(true)
       expect(newValue.football).toBe(true)
       expect(oldValue.football).toBe(false)
       done()

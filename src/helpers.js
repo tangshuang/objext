@@ -34,7 +34,7 @@ export function xset(target, path, value) {
 
   // 注意，clone必须在define后面，因为涉及到计算属性问题，如果value中包含了计算属性，clone会使用它的结算结果
   let data = clone(value)
-  assign(target.$$data, path, data)
+  assign(target.$$__data, path, data)
 }
 
 export function xdefine(target, key, value) {
@@ -53,16 +53,16 @@ export function xdefine(target, key, value) {
       // 会冒泡上去
       target.$validate(key, v)
 
-      let oldData = clone(target.$$data)
+      let oldData = clone(target.$$__data)
       let data = xcreate(v, key, target)
       $$ = data
 
       // 直接更新数据
-      assign(target.$$data, key, v)
+      assign(target.$$__data, key, v)
 
       // 触发watch
       // 会冒泡上去
-      let newData = clone(target.$$data)
+      let newData = clone(target.$$__data)
       target.$dispatch(key, newData, oldData)
     },
     get() {
@@ -105,11 +105,11 @@ export function xobject(value, key, target) {
   objx.$define('$$__parent', target)
 
   // 创建引用，这样当修改子节点的时候，父节点自动修改
-  if (!target.$$data[key]) {
-    target.$$data[key] = {}
+  if (!target.$$__data[key]) {
+    target.$$__data[key] = {}
   }
 
-  objx.$enhance('$$data', () => target.$$data[key])
+  objx.$enhance('$$__data', () => target.$$__data[key])
   objx.$enhance('$$locked', () => target.$$locked)
 
   objx.$put(value)
@@ -124,8 +124,8 @@ export function xarray(value, key, target) {
   let proto = []
 
   // 创建引用，这样当修改子节点的时候，父节点自动修改
-  if (!target.$$data[key]) {
-    target.$$data[key] = []
+  if (!target.$$__data[key]) {
+    target.$$__data[key] = []
   }
 
   // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
@@ -136,16 +136,16 @@ export function xarray(value, key, target) {
     $$__parent: {
       value: target,
     },
-    $$data: {
-      get: () => target.$$data[key],
+    $$__data: {
+      get: () => target.$$__data[key],
     },
     $$locked: {
       get: () => target.$$locked,
     },
-    $$listeners: {
+    $$__listeners: {
       value: [],
     },
-    $$validators: {
+    $$__validators: {
       value: [],
     },
     $dispatch: {
@@ -169,9 +169,9 @@ export function xarray(value, key, target) {
 
         // 这里注意：数组的这些方法没有校验逻辑，因为你不知道这些方法到底要对那个元素进行修改
 
-        let oldData = clone(target.$$data)
+        let oldData = clone(target.$$__data)
 
-        Array.prototype[method].call(target.$$data[key], ...args)
+        Array.prototype[method].call(target.$$__data[key], ...args)
         Array.prototype[method].call(this, ...args)
 
         // TODO: 根据不同类型的操作判断是否要重新xdefine
@@ -180,7 +180,7 @@ export function xarray(value, key, target) {
           xdefine(this, i , item)
         })
 
-        let newData = clone(target.$$data)
+        let newData = clone(target.$$__data)
         target.$dispatch(key, newData, oldData)
       }
     }
@@ -192,7 +192,7 @@ export function xarray(value, key, target) {
 
   value.forEach((item, i) => {
     xdefine(objx, i, item)
-    objx.$$data[i] = item
+    objx.$$__data[i] = item
   })
 
   return objx

@@ -3,6 +3,8 @@ import {
   isFunction,
   isObject,
   inObject,
+  isArray,
+  isInstanceOf,
   makeKeyPath,
   makeKeyChain,
   parse,
@@ -18,13 +20,13 @@ import {
 
 export class Objext {
   constructor(data) {
-    this.$define('$$snapshots', [])
-    this.$define('$$validators', [])
-    this.$define('$$listeners', [])
+    this.$define('$$__snapshots', [])
+    this.$define('$$__validators', [])
+    this.$define('$$__listeners', [])
 
-    this.$define('$$data', {})
+    this.$define('$$__data', {})
+
     this.$define('$$hash', '')
-
     this.$define('$$locked', false)
     this.$define('$$slient', false)
 
@@ -121,11 +123,11 @@ export class Objext {
 
     if (!chain.length) {
       delete this[key]
-      delete this.$$data[key]
+      delete this.$$__data[key]
     }
     else {
       let target = makeKeyPath(chain)
-      let data = parse(this.$$data, target)
+      let data = parse(this.$$__data, target)
       let node = parse(this, target)
       delete data[key]
       delete node[key]
@@ -166,7 +168,7 @@ export class Objext {
 
     // 先把当前视图的所有数据删掉
     let keys = Object.keys(this)
-    let current = this.$$data
+    let current = this.$$__data
     keys.forEach((key) => {
       delete current[key]
       delete this[key]
@@ -281,7 +283,7 @@ export class Objext {
       configurable: true,
       enumerable : true,
       get: () => {
-        let value = parse(this.$$data, key)
+        let value = parse(this.$$__data, key)
         return value
       },
     })
@@ -315,7 +317,7 @@ export class Objext {
    */
   $__compute(key, getter) {
     this.$define('$$__dep', { key, getter })
-    let data = this.$$data
+    let data = this.$$__data
     let newValue = getter.call(this)
     assign(data, key, newValue)
     this.$define('$$__dep', {})
@@ -331,7 +333,7 @@ export class Objext {
   $watch(path, fn, deep) {
     path = makeKeyPath(makeKeyChain(path))
 
-    this.$$listeners.push({
+    this.$$__listeners.push({
       path,
       fn,
       deep,
@@ -346,14 +348,14 @@ export class Objext {
    */
   $unwatch(path, fn) {
     let indexes = []
-    this.$$listeners.forEach((item, i) => {
+    this.$$__listeners.forEach((item, i) => {
       if (item.path === path && item.fn === fn) {
         indexes.push(i)
       }
     })
     // 从后往前删，不会出现问题
     indexes.reverse()
-    indexes.forEach(i => this.$$listeners.splice(i, 1))
+    indexes.forEach(i => this.$$__listeners.splice(i, 1))
     return this
   }
   /**
@@ -381,7 +383,7 @@ export class Objext {
       return this
     }
 
-    let listeners = this.$$listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0) || item.path === '*')
+    let listeners = this.$$__listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0) || item.path === '*')
     let propagation = true
     let pipeline = true
     let stopPropagation = () => propagation = false
@@ -396,7 +398,7 @@ export class Objext {
 
       defineProperties(e, {
         match: item.path,
-        deep: item.deep,
+        deep: !!item.deep,
         path,
         target: this,
         newValue,
@@ -426,7 +428,7 @@ export class Objext {
       if (parent && parent.$dispatch) {
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
-        let parentNewData = parent.$$data
+        let parentNewData = parent.$$__data
         let parentOldData = assign(clone(parentNewData), key, oldData)
         parent.$dispatch(finalPath, parentNewData, parentOldData)
         propagate(parent)
@@ -445,14 +447,14 @@ export class Objext {
       return this
     }
 
-    let data = this.$$data
-    this.$$snapshots.push({
+    let data = this.$$__data
+    this.$$__snapshots.push({
       tag,
       data,
     })
 
     let next = clone(data)
-    this.$define('$$data', next)
+    this.$define('$$__data', next)
 
     return this
   }
@@ -465,7 +467,7 @@ export class Objext {
     }
 
     let data = null
-    let snapshots = this.$$snapshots
+    let snapshots = this.$$__snapshots
 
     if (tag === undefined) {
       data = snapshots[snapshots.length - 1]
@@ -486,7 +488,7 @@ export class Objext {
     }
 
     let next = clone(data)
-    this.$define('$$data', data)
+    this.$define('$$__data', data)
     this.$put(next)
 
     return this
@@ -501,7 +503,7 @@ export class Objext {
       return this
     }
 
-    let snapshots = this.$$snapshots
+    let snapshots = this.$$__snapshots
     if (tag === undefined) {
       snapshots.length = 0
     }
@@ -544,7 +546,7 @@ export class Objext {
    * ]
    */
   $formulate(validators) {
-    validators.forEach(item => this.$$validators.push(item))
+    validators.forEach(item => this.$$__validators.push(item))
     return this
   }
   /**
@@ -555,14 +557,14 @@ export class Objext {
    */
   $validate(path, data) {
     let result = null
-    let validators = this.$$validators.filter(item => arguments.length === 0 || item.path === path) // path不传的时候，校验全部验证规则
+    let validators = this.$$__validators.filter(item => arguments.length === 0 || item.path === path) // path不传的时候，校验全部验证规则
     for (let i = 0, len = validators.length; i < len; i ++) {
       let item = validators[i]
       if (!isObject(item)) {
         continue
       }
       let { check, message, warn, path } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
-      let value = arguments.length < 2 ? parse(this.$$data, path) : data
+      let value = arguments.length < 2 ? parse(this.$$__data, path) : data
       let bool = check(value)
       if (!bool) {
         let error = new Error(message)
@@ -598,14 +600,34 @@ export class Objext {
    * 基于当前对象，克隆出一个新对象
    */
   $clone() {
-    let value = this.$$data
+    let value = this.$$__data
     return new Objext(value)
   }
   valueOf() {
-    return clone(this.$$data)
+    const isObj = obj => isObject(obj) || isArray(obj) || isInstanceOf(obj, Objext)
+    const valueOf = (obj) => {
+      if (isObj(obj)) {
+        let result = isArray(obj) ? [] : {}
+        obj = isInstanceOf(obj, Objext) ? obj.$$__data : obj
+        for (let key in obj) {
+          let value = obj[key]
+          if (isObj(value)) {
+            result[key] = valueOf(value)
+          }
+          else {
+            result[key] = value
+          }
+        }
+        return result
+      }
+      else {
+        return obj
+      }
+    }
+    return valueOf(this.$$__data)
   }
   toString() {
-    return JSON.stringify(this.$$data)
+    return JSON.stringify(this.$$__data)
   }
 }
 
