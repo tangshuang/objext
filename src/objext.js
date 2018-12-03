@@ -488,7 +488,7 @@ export class Objext {
     }
 
     let next = clone(data)
-    this.$define('$$__data', data)
+    this.$define('$$__data', {})
     this.$put(next)
 
     return this
