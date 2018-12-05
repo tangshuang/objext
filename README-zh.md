@@ -277,6 +277,30 @@ objx.$batchEnd()
 
 上面的代码中，执行了多次$set，但是，所有的变动的回调会在$batchEnd的时候才执行，每一个属性对应的回调只会执行一次，因此body.main的变动会被视为一次，最终的新值是right，它的回调只会执行一次。
 
+### $depend(target, targetPath, seflPath)
+
+绑定其他objext实例。
+当一个objext实例的某个计算属性依赖另外一个objext实例的某个属性的时候用。
+
+```js
+const objx1 = new Objext({
+  name: 'tom',
+  get age() {
+    return objx2.age / 2
+  },
+})
+objx1.$depend(objx2, 'age', 'age')
+```
+
+上面的代码中，objx1的age属性依赖了objx2的age属性，但是由于计算属性的响应式效果仅对自己有效，它不能做到对外部依赖也有效果，因此，当objx2.age发生变化当时候，objx1并不能知道这个变化，它的age属性也就不会变，继续使用缓存，这就会造成错误。
+为了解决这个问题，我提供了$depend方法，它可以绑定两个objext实例的相关属性，保证可以做到正常响应。
+
+- target: 要绑定的目标实例
+- targetPath: 目标实例上要绑定的属性路径
+- selftPath: 自己的那个计算属性是要被绑定的
+
+当然，其实解决这个问题，还有一种办法，就是将多个objext实例放到一个大的objext实例中去，而不是分开管理。当然，这也是一种建议而已。
+
 ### $clone()
 
 基于当前数据，克隆出一个新的Objext对象，在保持数据相同的情况下，和原对象没有任何关系。

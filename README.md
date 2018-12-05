@@ -26,13 +26,13 @@ And then import it in your code:
 import Objext from 'objext'
 ```
 
-Or using CommonJS:
+Or use CommonJS:
 
 ```js
 const { Objext } = require('objext')
 ```
 
-Or using in browser:
+Or use in browser:
 
 ```html
 <script src="node_modules/objext/dist/objext.js"></script>
@@ -64,7 +64,7 @@ As you seen, just pass a normal js object into the constructor to create a objex
 
 Now you can use `objx` as a normal object, however, you can use more feature.
 
-## data operation with keyPath
+## Data operation with keyPath
 
 In normal js object, you can read a property by using `obj.prop`, however when you read a deeper property like `obj.body.feet`, if `obj.body` is undefined, you will get an TypeError. Using objext $get to avoid this.
 
