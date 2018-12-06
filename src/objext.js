@@ -464,35 +464,34 @@ export class Objext {
       }
     }
 
-    // 向上冒泡
-    if (propagation) {
-      let propagate = (target) => {
-        let parent = target.$$__parent
-        let key = target.$$__key
-        if (parent && parent.$dispatch) {
-          let fullPath = key + '.' + path
-          let finalPath = makeKeyPath(makeKeyChain(fullPath))
-          let parentNewData = parent.$$__data
-          let parentOldData = assign(clone(parentNewData), key, oldData)
-          parent.$dispatch(finalPath, parentNewData, parentOldData)
-          propagate(parent)
+    // *的监听在所有监听器后面，最后执行这些监听器
+    if (pipeline) {
+      let always = this.$$__listeners.filter(item => item.path === '*')
+      for (let i = 0, len = always.length; i < len; i ++) {
+        let item = always[i]
+        let e = createE(item, newData, oldData)
+
+        item.fn(e, newData, oldData)
+
+        // 阻止继续执行其他*的listener
+        if (!pipeline) {
+          break
         }
       }
-      propagate(this)
     }
 
-    // After all watchers finish, find * and run them
-    let always = this.$$__listeners.filter(item => item.path === '*')
-    pipeline = true // reset pipeline
-    for (let i = 0, len = always.length; i < len; i ++) {
-      let item = always[i]
-      let e = createE(item, newData, oldData)
+    // 向上冒泡
+    if (propagation) {
+      let parent = this.$$__parent
+      let key = this.$$__key
+      if (parent && parent.$dispatch) {
+        let parentNewData = parent.$$__data
+        let parentOldData = assign(clone(parentNewData), key, oldData)
+        let fullPath = key + '.' + path
+        let finalPath = makeKeyPath(makeKeyChain(fullPath))
 
-      item.fn(e, newData, oldData)
-
-      // 阻止继续执行其他listener
-      if (!pipeline) {
-        break
+        // 上一级objext又会触发再上一级的$dispatch
+        parent.$dispatch(finalPath, parentNewData, parentOldData)
       }
     }
 
@@ -641,17 +640,13 @@ export class Objext {
     }
 
     // 向上冒泡
-    let propagate = (target) => {
-      let parent = target.$$__parent
-      let key = target.$$__key
-      if (parent && parent.$validate) {
-        let fullPath = key + '.' + path
-        let finalPath = makeKeyPath(makeKeyChain(fullPath))
-        parent.$validate(finalPath, data)
-        propagate(parent)
-      }
+    let parent = this.$$__parent
+    let key = this.$$__key
+    if (parent && parent.$validate) {
+      let fullPath = key + '.' + path
+      let finalPath = makeKeyPath(makeKeyChain(fullPath))
+      parent.$validate(finalPath, data)
     }
-    propagate(this)
 
     return result
   }
