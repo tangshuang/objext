@@ -298,6 +298,7 @@ export class Objext {
   $__collect() {
     let { getter, key, dependency, target } = this.$$__dep
 
+    // 已经收集过了，就不再进行收集
     if (this.$$__deps.find(item => item.key === key && item.dependency === dependency)) {
       return false
     }
@@ -308,7 +309,7 @@ export class Objext {
       let newData = this.valueOf()
       this.$dispatch(key, newData, oldData)
     }
-    this.$$__deps.push({ key, dependency })
+    this.$$__deps.push({ key, dependency, getter })
     target.$watch(dependency, callback, true)
     return true
   }
@@ -316,12 +317,44 @@ export class Objext {
    * 依赖计算赋值
    */
   $__compute(key, getter) {
+    // 不传getter，则用现有的getter重新计算
+    if (getter === undefined) {
+      let item = this.$$__deps.find(item => item.key === key)
+      if (!item) {
+        return
+      }
+      getter = item.getter
+    }
+
     this.$define('$$__dep', { key, getter })
     let data = this.$$__data
     let newValue = getter.call(this)
     assign(data, key, newValue)
     this.$define('$$__dep', {})
     return newValue
+  }
+
+  /**
+   * 绑定两个objext实例，当目标实例的被依赖属性值发生变化时，重新计算当前实例的值。仅用于计算属性。
+   * @param {*} target 目标实例
+   * @param {*} targetPath 目标实例被依赖的属性路径
+   * @param {*} key 自己的属性
+   * @example
+   * const objx2 = new Objext({
+   *   body: { head: 12 }
+   * })
+   * const objx = new Objext({
+   *   get weight() { return objx2.body.head * 17.8 }
+   * })
+   * objx.$depend(objx2, 'body.head', 'weight')
+   * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
+   */
+  $depend(target, targetPath, key) {
+    target.$watch(targetPath, ({ newValue, oldValue, isEqual }) => {
+      if (!isEqual(newValue, oldValue)) {
+        this.$__compute(key)
+      }
+    })
   }
 
   /**

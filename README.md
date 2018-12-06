@@ -1,39 +1,47 @@
 # Objext
 
-JS超级对象，在原生object的基础上进行扩展，支持：
+A js object super extension.
 
-- 通过keyPath获取、设置数据
-- 响应式，可以通过watch监听某个keyPath
-- 数据版本控制，通过commit和reset，可以随时创建快照或恢复数据
-- 数据校验
-- 数据锁，锁住之后，不能做任何数据修改
+Supporting:
 
-## 安装和使用
+- get/set properties by using keyPath
+- responsive, watch changes by keyPath
+- data version, create/reset snapshots
+- data validation
+- data lock, immutable after locked
 
-安装：
+【[中文文档](README-zh.md)】
+
+## Install & Usage
+
+Install the pacakge in your project:
 
 ```
 npm i objext
 ```
 
-引入：
+And then import it in your code:
 
 ```js
 import Objext from 'objext'
 ```
 
+Or use CommonJS:
+
 ```js
 const { Objext } = require('objext')
 ```
 
+Or use in browser:
+
 ```html
-<script src="objext/dist/objext.js"></script>
+<script src="node_modules/objext/dist/objext.js"></script>
 <script>
-const { Objext } = window.objext
+const { Objext } = window['objext']
 </script>
 ```
 
-实例化：
+And then create a objext instance:
 
 ```js
 const objx = new Objext({
@@ -52,103 +60,122 @@ const objx = new Objext({
 })
 ```
 
-上面这个例子演示了如何创建一个超级对象，过程超级简单，只需要将一个普通对象传入new Objext作为参数即可，这样得到的对象objx和原始的对象的结构是一模一样，然而功能却比原始对象高级N倍。
+As you seen, just pass a normal js object into the constructor to create a objext instance.
 
-## 基于keyPath的数据操作
+Now you can use `objx` as a normal object, however, you can use more feature.
 
-你可以像使用普通对象一样使用objext实例，但是，这样会造成一些问题，特别是不能使用delete，也不能直接赋值一个新属性，这样会丢失这些属性的自动响应能力，如果你用过vue的话肯定对这个思路很了解。
+## Data operation with keyPath
 
-通过Objext创建的对象拥有以下方法，这些方法全部以$开头，并且是隐藏式的，不能通过for...in枚举。
+In normal js object, you can read a property by using `obj.prop`, however when you read a deeper property like `obj.body.feet`, if `obj.body` is undefined, you will get an TypeError. Using objext $get to avoid this.
 
 ### $get(keyPath)
 
-keyPath是指获取一个属性节点的路径，例如获取objx.body.head.hair属性，'body.head.hair'就是它的keyPath。
+Get data by keyPath. keyPath is a string which is the path to get the deep property value.
 
-和普通对象不同的是，通过$get方法，可以直接用keyPath读取一个属性。用$get方法的好处是，不用担心你去获取一个undefined的属性的子属性，举个例子，objx.body为undefined，那么，你在读取objx.body.head的时候，就会报错。但是用objx.$get('body.head')就可以避免这个问题。
+It will return the value you want to get, notice, if the property is a computed property, the return value will be the computed result.
 
-注意：$get得到的结果，是objext数据的一份拷贝，对该结果进行任何操作，都不会影响objext的当前数据。而且，还要考虑计算属性的问题，get得到的结果，会把计算属性转化为值，从而丢失计算的特性。
+```js
+let feet = objx.$get('body.feet')
+let feet = objx.body.feet
+```
+
+The difference between the previous sentences is, if original objx.body.feet is an object, objx.body.feet will return an objext instance, not the original object, so that you can use $get on it too.
 
 ### $set(keyPath, value)
 
-和$get的好处一样，普通对象你不能读取一个undefined属性的子属性，更别提给它赋值。而$set就可以做到，它可以为一个不存在的深层次的属性进行赋值：
+Set data by keyPath.
 
 ```js
-const objx = new Objext({})
-objx.$set('body.head.hair', 'black')
-// => { body: { head: { hair: 'black' } } }
+objx.$set('body.feet', 1)
+objx.body.feet = 1
 ```
 
-更重要的是，只有通过$set方法，才能让一个属性具备可响应式能力。比如你直接objx.feet = 2，feet这个属性不是响应式的，你不能用$watch去监听它。但是你objx.$set('feet', 2)之后，它就是响应式了。也就是说，必须用$set来添加属性，而不能直接像object属性赋值一样。
+However, if objx.body is not defined, it will be set as an object automaticly:
+
+```js
+console.log(objx.body) // undefined
+objx.$set('body.feet', 1)
+console.log(objx.body) // an objext instance which has 'feet' property
+```
+
+Notice, directly add a property to an objext instance is not allowed too, you must use `$set` or `$update` to add new properties.
 
 ### $remove(keyPath)
 
-用来移除某个属性，替代delete操作。
+Remove data by keyPath.
 
-### $put(data)
+```js
+objx.$remove('body.feet')
+```
 
-全量更新。
-用data去替换现在objext内的所有数据。原有数据会被全部清除。但是注意，watch绑定的回调不会被清除。
+Notice, it is completely not like `delete` operation. `delete objx.body.feet` is not allowed when you using objext, because it will broken reactive feature of objext.
 
-### $update(data)
+## Responsive data
 
-增量更新。
-批量更新data，如果data中的某个属性不存在，则增加这个属性的数据。
-它不会删除任何数据，只会让数据更新或增加。
-
-注意：$update和$put也会触发watch的东西，但是，它们是一次性触发的，在全部数据修改完之后，才会触发watch回调，而非每次修改一个属性就被触发。具体可以阅读下方的$batchStart/$batchEnd
-
-## 响应式数据
-
-Objext创建到对象是响应式的，和vue的那种模式一样，当一个属性发生变化时，是可以被监测到的。
+If you have used Vue or Mobx, you may be familar with responsive data. Objext support responsive data, and you can watch the change of data change.
 
 ### $watch(keyPath, callback, deep)
 
-和angular的$watch使用很像，它用来监听一个属性发生变化：
+It is very like angular's $watch method:
 
 ```js
 objx.$watch('body.head.hair', (e, newValue, oldValue) => {
-  // e: 包含一些信息，你可以用来进行判断
-  // newValue: 新值
-  // oldValue: 老值
-  // 任何对body.head.hair的修改都会触发callback，即使newValue===oldValue，因此，你必须在callback里面自己做逻辑去判断是否要执行一些代码
+  // ...
 })
 ```
 
-我们看下e里面都有些什么：
-
-- oldValue: 老数据
-- newValue: 新数据
-- path: 被修改的属性的path信息
-- key: watch的第一个参数
-- target: 被监听到的属性所属的对象
-- preventDefault(): 放弃剩下的所有监听回调
-- stopPropagation(): 禁止冒泡，Objext的监听采取冒泡模式，当一个节点的属性发生变化时，先是这个节点的watcher被激活，然后往它的父级不断广播，直到最顶层
-
-如果你嫌麻烦，可以这样做更舒服：
+Then I use `$set` or directly set objx.body.head.hair to change its value, the callback function will run:
 
 ```js
-objx.$watch('body.head.hair', ({ oldValue, newValue }) => {
-  // 这样更舒服吧
+objx.$set('body.head.hair', 'black')
+objx.body.head.hair = 'black'
+```
+
+The paramater `e` of callback contains:
+
+- oldValue
+- newValue
+- path: the real changed property's keyPath
+- key: the value of $watch's first parameter `keyPath`
+- target: the parent node of changed property
+- preventDefault(): stop invoke other callbacks of real keyPath
+- stopPropagation(): stop invoke callbacks of this property's parents and ancestors
+- isEqual(): a helper function to compare oldValue and newValue
+
+So you can do like this:
+
+```js
+objx.$watch('body.head.hair', ({ oldValue, newValue, isEqual }) => {
+  if (!isEqual(oldValue, newValue)) {
+    // do something...
+  }
 })
 ```
 
-需要注意的是，使用`$put`方法全量更新数据时，不会触发任何watcher。
+`deep` is to set watch children properties.
 
-**deep**
+```js
+objx.$watch('body', ({ path }) => {
+  console.log(path + ' changed') // => 'body.head.hair changed'
+}, true)
+objx.body.head.hair = 'red' // this will trigger the callback function too
+```
 
-当第三个参数deep设置为true的时候，表示深度观察，它的深层级节点发生变动的时候也能监听到。
+When you want to watch any change, you can set keyPath to be `*`:
 
-**keyPath为'*'**
-
-将keyPath设置为'*'表示监听任何变化。
+```js
+objx.$watch('*', () => {
+  // run when any property changed
+})
+```
 
 ### $unwatch(keyPath, callback)
 
-$watch的反函数，取消某个监听。
+Remove the watcher.
 
-### 计算属性
+## Computed properties
 
-Objext支持计算属性，传入原生的计算属性，之后可以得到一个响应式的计算属性，并且具备缓存能力。注意，仅支持传入getter，setter将被直接丢掉。
+Objext supports computed properties, and you can watch the change of computed properties too:
 
 ```js
 const objx = new Objext({
@@ -160,21 +187,22 @@ const objx = new Objext({
 objx.$watch('height', (e, newValue, oldValue) => {
   console.log(newValue)
 })
-objx.age = 20
-// 由于height属性依赖age属性，因此，当修改age属性时，height也会同时被改变。
+objx.age = 20 // the $watch callback will run, because objx.height is dependent on objx.age
 ```
 
-## 数据版本控制
+Notice, it only supports getter, setter will be dropped if you give.
 
-一个数据，在通过Objext的方法进行修改时，它是基于当前的一个镜像，如果你玩过docker的话，对镜像应该比较熟悉。Objext提供了数据版本控制的能力，通过两个方法，可以实现创建一个快照，和恢复一个快照的能力。
+## Version controlable data
+
+When you use objext to manage some data, your data may change always. However, sometimes you want to recover previous data. Objext provides a more modern version control of data like git do.
 
 ### $commit(tag)
 
-创建一个名为tag的快照。
+Create a snapshot of current data with name by `tag`.
 
 ### $reset(tag)
 
-恢复到名为tag的快照的数据。
+Recover data with the snapshot whose name is `tag`.
 
 ```js
 objx.name = 'tomy'
@@ -186,47 +214,39 @@ console.log(objx.name) // => 'tomy'
 
 ### $revert(tag)
 
-删除名为tag的所有快照。
+Remove snapshots whose name is `tag`.
+If you want to remove all snapshots, don't pass tag.
 
-## 数据校验
 
-通过设置校验器，可以对数据进行校验。它有两种校验方式，一种是在使用修改/$set添加属性的时候，另外一种是直接调用$validate方法，对整个数据进行全量校验。
+## Validate
 
-这里需要注意的是，通过手动添加属性，是不能触发校验的，校验只有在使用$set进行添加属性时被使用。
-其实，实际上，必须用$set来添加属性。
-
-还有一点是，校验是后置的，也就是说，你无法在实例化时校验初始数据。
+Objext provide ability to validate data.
 
 ### $formulate(validators)
 
-添加校验器。
-
-它可以被多次执行，所有的校验器都会被记录下来。使用时应该注意，校验器一般是在使用前设置，因为添加好校验器之后，它们是不能被删除的。
-
-_validators_是一个数组，里面包含了所有校验器配置信息，每一个元素都是一个对象，即一个校验器的配置信息。这个对象的格式如下：
+Set validate rules. `validators` is an array, which contains items has the following structure:
 
 ```js
 {
-  path: 'body.head', // 要校验的路径
-  check: value => Boolean, // 校验函数，返回boolean值
-  message: '格式不对', // 校验失败时返回的错误message信息
-  warn: error => {}, // 校验失败后要执行的函数，error包含了message信息，另外还包含value和path信息
+  path: 'body.head',
+  check: value => value !== null, // should return boolean
+  message: 'should not be null', // when validate fail, return this message to warn
+  warn: error => {}, // the function to run when validate fail,
 }
 ```
 
-所有的校验器被放在一个队列里。在校验时，一个校验器未通过失败时，就不会往下继续校验了。
-
 ### $validate()
 
-一次性校验所有数据，校验器队列会被依次运行。
+Run all validators, if one failed, will not run the left ones.
 
-## 数据锁
+## Data lock
 
-通过锁开关，可以实现对数据的锁定和解锁。对象被锁死之后，无法进行修改操作。
+You can lock data before some operation.
 
 ### $lock()
 
-锁死数据。
+Lock data, then data is not writable with objext api.
+
 
 ```js
 objx.name = 'tomy'
@@ -235,46 +255,74 @@ objx.name = 'pina'
 console.log(objx.name) // => 'tomy'
 ```
 
-上锁后，深层级的数据也被上锁，无法被修改。
-
 ### $unlock()
 
-解锁数据。
+Unlock data.
 
-## 其他
+## Other APIs
 
-另外，为了更方便的获取对象的信息，Objext提供了几个方法。
+You can use methods as chain like:
+
+```js
+objx.$slient(true).$set('name', 'lily').$slient(false)
+```
+
+### $put(data)
+
+Reset all data to be new.
+The current properties will be removed firstly, and new data will be set into objext instance.
+
+### $update(data)
+
+Update existing data one time, watchers will only run after all data updated.
+If some properties do not exist, they will be added to the data.
 
 ### $slient(is)
 
-切换安静模式/响应式模式。is为true时，表示进入安静模式，所有的watchers都不会被触发。
+Change the slient mode. When slient mode is on, no watchers will be trigger when data change.
+
+```js
+objx.$watch('name', () => console.log('name changed.'))
+objx.$slient(true)
+objx.$set('name', 'lily') // this will not trigger watcher because of slient mode
+objx.$slient(false)
+```
 
 ### $batchStart() / $batchEnd()
 
-开启一个批量更新任务，开启之后，在调用$batchEnd之前，任何$set都不会触发watch回调，直到$batchEnd被调用时，所有收集到的watch才会一次性执行所有回调。
+During batch updating, watchers will not be triggered until $batchEnd() run.
 
 ```js
 objx.$batchStart()
+// the following $set will not trigger watchers
 objx.$set('body.main', 'left')
 objx.$set('name', 'ceci')
 objx.$set('body.main', 'right')
+// when $batchEnd() run, all watchers will be invoked.
+// the watchers of 'body.main' will only run once with final value 'right'
 objx.$batchEnd()
 ```
 
-上面的代码中，执行了多次$set，但是，所有的变动的回调会在$batchEnd的时候才执行，每一个属性对应的回调只会执行一次，因此body.main的变动会被视为一次，最终的新值是right，它的回调只会执行一次。
+`$update` and `$put` use $batchStart/$batchEnd inside.
 
 ### $clone()
 
-基于当前数据，克隆出一个新的Objext对象，在保持数据相同的情况下，和原对象没有任何关系。
+Clone current objext instance to a new objext instance.
 
 ### $$hash
 
-这是一个属性，可以获取当前对象的hash值，在判断两个Objext对象的实际内容是否相等时，可以利用它来进行判断。
+A identity of current objext instance, you can it to compare two objext instances:
+
+```js
+if (objx1.$$hash === objx2.$$hash) {
+  // ...
+}
+```
 
 ### valueOf()
 
-快速获取当前Objext对象的原生对象内容。
+Get current objext instance's original js object.
 
 ### toString()
 
-获取原生对象值的字符串形式。
+Get current objext instance's original js object's json string.
