@@ -383,18 +383,22 @@ export class Objext {
       return this
     }
 
-    let listeners = this.$$__listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0) || item.path === '*')
+    let listeners = this.$$__listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0))
     let propagation = true
     let pipeline = true
     let stopPropagation = () => propagation = false
     let preventDefault = () => pipeline = false
-
-    for (let i = 0, len = listeners.length; i < len; i ++) {
-      let item = listeners[i]
-      let targetPath = item.path === '*' ? '' : item.path
-      let newValue = parse(newData, targetPath)
-      let oldValue = parse(oldData, targetPath)
+    let createE = (item, newValue, oldValue) => {
       let e = {}
+      let error = new Error('')
+      let stackraw = error.stack || ''
+
+      let stacks = stackraw.split('\n')
+      stacks.shift()
+      stacks.shift()
+      stacks = stacks.map(line => line.trim())
+
+      let stack = stacks.join('\n')
 
       defineProperties(e, {
         match: item.path,
@@ -406,7 +410,18 @@ export class Objext {
         stopPropagation,
         preventDefault,
         isEqual,
+        stack,
       }, false)
+
+      return e
+    }
+
+    for (let i = 0, len = listeners.length; i < len; i ++) {
+      let item = listeners[i]
+      let targetPath = item.path
+      let newValue = parse(newData, targetPath)
+      let oldValue = parse(oldData, targetPath)
+      let e = createE(item, newValue, oldValue)
 
       item.fn(e, newValue, oldValue)
 
@@ -416,25 +431,37 @@ export class Objext {
       }
     }
 
-    // 阻止冒泡
-    if (!propagation) {
-      return this
+    // 向上冒泡
+    if (propagation) {
+      let propagate = (target) => {
+        let parent = target.$$__parent
+        let key = target.$$__key
+        if (parent && parent.$dispatch) {
+          let fullPath = key + '.' + path
+          let finalPath = makeKeyPath(makeKeyChain(fullPath))
+          let parentNewData = parent.$$__data
+          let parentOldData = assign(clone(parentNewData), key, oldData)
+          parent.$dispatch(finalPath, parentNewData, parentOldData)
+          propagate(parent)
+        }
+      }
+      propagate(this)
     }
 
-    // 向上冒泡
-    let propagate = (target) => {
-      let parent = target.$$__parent
-      let key = target.$$__key
-      if (parent && parent.$dispatch) {
-        let fullPath = key + '.' + path
-        let finalPath = makeKeyPath(makeKeyChain(fullPath))
-        let parentNewData = parent.$$__data
-        let parentOldData = assign(clone(parentNewData), key, oldData)
-        parent.$dispatch(finalPath, parentNewData, parentOldData)
-        propagate(parent)
+    // After all watchers finish, find * and run them
+    let always = this.$$__listeners.filter(item => item.path === '*')
+    pipeline = true // reset pipeline
+    for (let i = 0, len = always.length; i < len; i ++) {
+      let item = always[i]
+      let e = createE(item, newData, oldData)
+
+      item.fn(e, newData, oldData)
+
+      // 阻止继续执行其他listener
+      if (!pipeline) {
+        break
       }
     }
-    propagate(this)
 
     return this
   }
