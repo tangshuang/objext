@@ -249,11 +249,17 @@ export class Objext {
    * 结束批量更新模式
    */
   $batchEnd() {
+    const batches = [].concat(this.$$__batch)
+
+    // 重置信息，需要先重置，否则this.$dispatch不工作
+    this.$define('$$__isBatchUpdate', false)
+    this.$$__batch.length = 0
+
     // 不再触发dispatch操作
     if (!this.$$slient) {
       // 把收集到的变动集中起来，去重，得到最小集
-      let batch = {}
-      this.$$__batch.forEach(({ path, newData, oldData }) => {
+      const batch = {}
+      batches.forEach(({ path, newData, oldData }) => {
         batch[path] = {
           path,
           newData,
@@ -263,13 +269,10 @@ export class Objext {
           batch[path].oldData = oldData
         }
       })
-      let list = Object.values(batch)
-      list.forEach(({ path, newData, oldData }) => this.$dispatch({ path, newData, oldData }))
+      const list = Object.values(batch)
+      list.forEach(({ path, newData, oldData }) => this.$dispatch(path, newData, oldData))
     }
 
-    // 重置信息
-    this.$$__batch.length = 0
-    this.$define('$$__isBatchUpdate', false)
     return this
   }
 
