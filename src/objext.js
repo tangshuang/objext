@@ -629,12 +629,12 @@ export class Objext {
   /**
    * 校验数据
    * @param {*} path 可选，不传时校验所有规则
-   * @param {*} data 可选，用该值作为备选值校验，在$set新值之前对该新值做校验时使用
+   * @param {*} next 可选，用该值作为备选值校验，在$set新值之前对该新值做校验时使用
    * @return {Error} 一个Error的实例，message是校验器中设置的，同时，它附带两个属性（value, path），并且它会被传给校验器中的warn函数
    */
-  $validate(path, data) {
+  $validate(path, next) {
     let result = null
-    let validators = this.$$__validators.filter(item => arguments.length === 0 || item.path === path) // path不传的时候，校验全部验证规则
+    let validators = this.$$__validators.filter(item => path === undefined || item.path === path) // path不传的时候，校验全部验证规则
     let deferers = []
 
     const createError = ({ path, value, message, warn }) => {
@@ -655,7 +655,7 @@ export class Objext {
         continue
       }
       let { validate, message, warn, path, determine, deferred } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
-      let value = arguments.length < 2 ? parse(this.$$__data, path) : data
+      let value = arguments.length === 2 && arguments[0] !== undefined && arguments[0] !== null ? next : parse(this.$$__data, path)
 
       // 某些情况下不检查该字段
       if (isFunction(determine) && !determine.call(this, value)) {
@@ -689,7 +689,7 @@ export class Objext {
     if (parent && parent.$validate) {
       let fullPath = key + '.' + path
       let finalPath = makeKeyPath(makeKeyChain(fullPath))
-      parent.$validate(finalPath, data)
+      parent.$validate(finalPath, next)
     }
 
     // 如果全部校验器都是异步的，那么返回一个promise
