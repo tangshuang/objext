@@ -45,6 +45,10 @@ export class Objext {
       this.$put(data)
     }
 
+    this.$__init()
+  }
+
+  $__init() {
     // 每当值发生变化时，hash被更新
     this.$watch('*', ({ newValue, oldValue }) => {
       if (!isEqual(newValue, oldValue)) {
@@ -509,11 +513,25 @@ export class Objext {
       return this
     }
 
-    let data = this.$$__data
-    this.$$__snapshots.push({
-      tag,
-      data,
-    })
+    if (tag === undefined) {
+      return this
+    }
+
+    let data = this.valueOf()
+    let snapshots = this.$$__snapshots
+    let i = snapshots.findIndex(item => item.tag === tag);
+    if (i > -1) {
+      snapshots[i] = {
+        tag,
+        data,
+      }
+    }
+    else {
+      snapshots.push({
+        tag,
+        data,
+      })
+    }
 
     let next = clone(data)
     this.$define('$$__data', next)
@@ -532,17 +550,11 @@ export class Objext {
     let snapshots = this.$$__snapshots
 
     if (tag === undefined) {
-      data = snapshots[snapshots.length - 1]
+      data = snapshots[0]
     }
     else {
-      // 从后往前找，之所以取最后一个，是为了防止commit两个相同的tag，如果出现这种情况，应该取后面的tag，而非前面一个
-      for (let i = snapshots.length - 1; i >= 0; i --) {
-        let item = snapshots[i]
-        if (item.tag === tag) {
-          data = item.data
-          break
-        }
-      }
+      let item = snapshots.find(item => item.tag === tag)
+      data = item.data
     }
 
     if (!data) {
@@ -608,6 +620,7 @@ export class Objext {
    * ]
    */
   $formulate(validators) {
+    validators = Array.isArray(validators) ? validators : [validators]
     validators.forEach(item => this.$$__validators.push(item))
     return this
   }

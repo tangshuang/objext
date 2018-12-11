@@ -171,7 +171,8 @@ export function xarray(value, key, target) {
 
         let oldData = clone(target.$$__data)
 
-        Array.prototype[method].call(target.$$__data[key], ...args)
+        // 这里需要处理当...args里面包含了计算属性的问题
+        Array.prototype[method].call(target.$$__data[key], ...clone(args))
         Array.prototype[method].call(this, ...args)
 
         // TODO: 根据不同类型的操作判断是否要重新xdefine
