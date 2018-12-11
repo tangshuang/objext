@@ -634,7 +634,7 @@ export class Objext {
    */
   $validate(path, next) {
     let result = null
-    let validators = this.$$__validators.filter(item => path === undefined || item.path === path) // path不传的时候，校验全部验证规则
+    let validators = this.$$__validators.filter(item => path === undefined || path === null || item.path === path) // path不传的时候，校验全部验证规则
     let deferers = []
 
     const createError = ({ path, value, message, warn }) => {
