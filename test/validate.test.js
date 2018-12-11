@@ -12,18 +12,18 @@ describe('对数据进行校验', () => {
   const validators = [
     {
       path: 'name',
-      check: value => typeof value === 'string',
+      validate: value => typeof value === 'string',
       message: 'name必须为字符串',
       warn: (error) => { throw error },
     },
     {
       path: 'age',
-      check: value => typeof value === 'number',
+      validate: value => typeof value === 'number',
       message: 'age必须为数字',
       warn: (error) => { throw error },
     },
   ]
-  
+
   test('修改数据的时候进行校验', () => {
     let objx = new Objext(origin)
     objx.$formulate(validators)

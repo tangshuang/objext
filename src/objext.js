@@ -613,9 +613,11 @@ export class Objext {
    * [
    *    {
    *        path: 'body.head', // 要监听的路径
-   *        check: value => typeof value === 'object', // 要执行的检查器
+   *        determine: value => typeof value === 'object', // 在什么情况下才执行校验器
+   *        validate: value => typeof value === 'object', // 要执行的检查器
    *        message: '头必须是一个对象',
    *        warn: (error) => {},
+   *        deferred: true, // 是否异步校验，异步校验不会中断校验过程，从当前进程中脱离出去，而是交给异步进程去处理，如果全部校验器都是异步的,$validate会返回一个promise
    *    }
    * ]
    */
@@ -633,24 +635,50 @@ export class Objext {
   $validate(path, data) {
     let result = null
     let validators = this.$$__validators.filter(item => arguments.length === 0 || item.path === path) // path不传的时候，校验全部验证规则
+    let deferers = []
+
+    const createError = ({ path, value, message, warn }) => {
+      let error = new Error(message)
+      Object.defineProperties(error, {
+        value: { value },
+        path: { value: path },
+      })
+      if (isFunction(warn)) {
+        warn(error)
+      }
+      return error
+    }
+
     for (let i = 0, len = validators.length; i < len; i ++) {
       let item = validators[i]
       if (!isObject(item)) {
         continue
       }
-      let { check, message, warn, path } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
+      let { validate, message, warn, path, determine, deferred } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
       let value = arguments.length < 2 ? parse(this.$$__data, path) : data
-      let bool = check(value)
-      if (!bool) {
-        let error = new Error(message)
-        Object.defineProperties(error, {
-          value: { value },
-          path: { value: path },
-        })
-        if (isFunction(warn)) {
-          warn(error)
+
+      // 某些情况下不检查该字段
+      if (isFunction(determine) && !determine(value)) {
+        if (deferred) {
+          deferers.push(Promise.resolve())
         }
-        result = error
+        continue
+      }
+
+      // 异步校验部分
+      if (deferred) {
+        let deferer = Promise.resolve().then(() => validate(value)).then((bool) => {
+          if (!bool) {
+            return createError({ path, value, message, warn })
+          }
+        })
+        deferers.push(deferer)
+        continue
+      }
+
+      let bool = validate(value)
+      if (!bool) {
+        result = createError({ path, value, message, warn })
         break
       }
     }
@@ -662,6 +690,24 @@ export class Objext {
       let fullPath = key + '.' + path
       let finalPath = makeKeyPath(makeKeyChain(fullPath))
       parent.$validate(finalPath, data)
+    }
+
+    // 如果全部校验器都是异步的，那么返回一个promise
+    if (deferers.length === validators.length && validators.length) {
+      let i = 0
+      const run = (result) => {
+        if (result instanceof Error) {
+          return result
+        }
+
+        let deferer = deferers[i]
+        if (!deferer) {
+          return result
+        }
+
+        return deferer.then(run).catch(run)
+      }
+      return run(result)
     }
 
     return result

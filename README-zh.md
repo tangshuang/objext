@@ -195,7 +195,8 @@ _validators_是一个数组，里面包含了所有校验器配置信息，每�
 ```js
 {
   path: 'body.head', // 要校验的路径
-  check: value => Boolean, // 校验函数，返回boolean值
+  determine: value => Boolean, // 是否要校验这个path，返回false的时候，将不会校验这个path
+  validate: value => Boolean, // 校验函数，返回boolean值
   message: '格式不对', // 校验失败时返回的错误message信息
   warn: error => {}, // 校验失败后要执行的函数，error包含了message信息，另外还包含value和path信息
 }
