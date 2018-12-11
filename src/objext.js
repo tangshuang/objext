@@ -644,7 +644,7 @@ export class Objext {
         path: { value: path },
       })
       if (isFunction(warn)) {
-        warn(error)
+        warn.call(this, error)
       }
       return error
     }
@@ -658,7 +658,7 @@ export class Objext {
       let value = arguments.length < 2 ? parse(this.$$__data, path) : data
 
       // 某些情况下不检查该字段
-      if (isFunction(determine) && !determine(value)) {
+      if (isFunction(determine) && !determine.call(this, value)) {
         if (deferred) {
           deferers.push(Promise.resolve())
         }
@@ -667,7 +667,7 @@ export class Objext {
 
       // 异步校验部分
       if (deferred) {
-        let deferer = Promise.resolve().then(() => validate(value)).then((bool) => {
+        let deferer = Promise.resolve().then(() => validate.call(this, value)).then((bool) => {
           if (!bool) {
             return createError({ path, value, message, warn })
           }
@@ -676,7 +676,7 @@ export class Objext {
         continue
       }
 
-      let bool = validate(value)
+      let bool = validate.call(this, value)
       if (!bool) {
         result = createError({ path, value, message, warn })
         break
