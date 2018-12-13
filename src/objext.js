@@ -40,15 +40,15 @@ export class Objext {
     this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$$__batch', []) // 用来记录批量一次更新的内容
 
+    this.$init(data)
+  }
+
+  $init(data) {
     // 写入数据
     if (data) {
       this.$put(data)
     }
 
-    this.$__init()
-  }
-
-  $__init() {
     // 每当值发生变化时，hash被更新
     this.$watch('*', ({ newValue, oldValue }) => {
       if (!isEqual(newValue, oldValue)) {
