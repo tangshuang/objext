@@ -317,3 +317,35 @@ objx1.$depend(objx2, 'age', 'age')
 ### toString()
 
 获取原生对象值的字符串形式。
+
+## 静态方法
+
+Objext也输出一些静态方法，可以帮助开发者快速实现一些小功能。
+
+### isEqual(value1, value2)
+
+判断两个变量是否内容相等，当在判断对象/数组的时候，是判断它们的内容，而非变量的引用地址，因此，它是一个深度判断。
+
+### clone(value)
+
+深克隆一个对象，甚至对象中包含了自引用关系，clone也会保持这种引用。
+
+### isEmpty(value)
+
+判断一个值是否为空。包括空对象、空数组、空字符串、null、undefined、NaN。
+
+### isArray(value)
+
+判断是否为数组，它比Array.isArray更严格，它要求value必须是直接的Array实例，那些基于Array扩展的类的实例不算在内。
+
+### isObject(value)
+
+判断一个值是否为对象，和isArray的判断一样，它非常严格，必须是直接的Object实例才会返回true。
+
+### inArray(item, arr)
+
+判断一个item是否在数组arr中。
+
+### inObject(prop, obj)
+
+判断对象obj是否拥有属性prop。这个判断也很严格，它要求prop在obj中是可枚举的，它和 prop in obj 的判断完全不同。

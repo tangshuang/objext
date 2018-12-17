@@ -156,7 +156,7 @@ export function clone(obj) {
 }
 
 export function isArray(arr) {
-  return Array.isArray(arr)
+  return Array.isArray(arr) && arr.constructor === Array
 }
 
 export function isFunction(fn) {
