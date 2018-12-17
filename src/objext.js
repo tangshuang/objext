@@ -4,7 +4,9 @@ import {
   isObject,
   inObject,
   isArray,
+  inArray,
   isInstanceOf,
+  isEmpty,
   makeKeyPath,
   makeKeyChain,
   parse,
@@ -357,7 +359,7 @@ export class Objext {
    * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
   $depend(target, targetPath, key) {
-    target.$watch(targetPath, ({ newValue, oldValue, isEqual }) => {
+    target.$watch(targetPath, ({ newValue, oldValue }) => {
       if (!isEqual(newValue, oldValue)) {
         this.$__compute(key)
       }
@@ -449,7 +451,6 @@ export class Objext {
         oldValue,
         stopPropagation,
         preventDefault,
-        isEqual,
         stack,
       }, false)
 
@@ -747,5 +748,15 @@ export class Objext {
     return JSON.stringify(this.valueOf())
   }
 }
+
+Objext.parse = parse
+Objext.assign = assign
+Objext.clone = clone
+Objext.isArray = isArray
+Objext.isObject = isObject
+Objext.inArray = inArray
+Objext.inObject = inObject
+Objext.isEqual = isEqual
+Objext.isEmpty = isEmpty
 
 export default Objext

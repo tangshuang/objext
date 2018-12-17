@@ -1,6 +1,6 @@
 {
   "name": "objext",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "a supper proxy of js object",
   "main": "dist/objext.js",
   "directories": {
