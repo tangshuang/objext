@@ -16,7 +16,6 @@ import {
   getStringHashcode,
   defineProperty,
   defineProperties,
-  stringify,
   valueOf,
 } from './utils'
 
@@ -29,8 +28,6 @@ export class Objext {
     this.$define('$$__data', {})
 
     this.$define('$$hash', '')
-    this.$define('$$locked', false)
-    this.$define('$$slient', false)
 
     this.$define('$$__dep', {})
     this.$define('$$__deps', [])
@@ -38,6 +35,8 @@ export class Objext {
     this.$define('$$__parent', null)
     this.$define('$$__key', '')
 
+    this.$define('$$__slient', false)
+    this.$define('$$__locked', false)
     this.$define('$$__inited', false) // 用来记录是否已经塞过数据了
     this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$$__batch', []) // 用来记录批量一次更新的内容
@@ -77,11 +76,11 @@ export class Objext {
   }
 
   /**
-   * 获取key对应的值，该值是原始值的克隆，因此，即使被修改也无所谓
+   * 获取key对应的值
    * @param {*} path
    */
   $get(path) {
-    return parse(this.$$__data, path)
+    return parse(this, path)
   }
   /**
    * 设置一个普通值属性
@@ -89,29 +88,28 @@ export class Objext {
    * @param {*} value
    */
   $set(path, value) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
     function xdefine(target, key, value) {
-      let data = xcreate(value, key, target)
-      let $$ = data
+      assign(target.$$__data, key, valueOf(value)) // 一定要提前设置
+      value = xcreate(value, key, target)
 
       Object.defineProperty(target, key, {
         configurable : true,
         enumerable : true,
         set: (v) => {
-          if (target.$$locked) {
+          if (target.$isLocked()) {
             return
           }
 
           // 校验数据
-          // 会冒泡上去
           target.$validate(key, v)
 
-          let oldData = clone(target.$$__data)
-          let data = xcreate(v, key, target)
-          $$ = data
+          let oldData = valueOf(target)
+
+          value = xcreate(v, key, target)
 
           // 直接更新数据
           assign(target.$$__data, key, v)
@@ -133,19 +131,27 @@ export class Objext {
             target.$__collect()
           }
 
-          return $$
+          return value
         },
       })
     }
 
+
     function xcreate(value, key, target) {
       if (isInstanceOf(value, Objext)) {
-        value.$define('$$__key', key)
-        value.$define('$$__parent', target)
-        return value
+        let objx = value.$clone()
+        objx.$define('$$__key', key)
+        objx.$define('$$__parent', target)
+        objx.$enhance('$$__data', () => target.$$__data[key])
+        return objx
       }
       else if (isObject(value)) {
-        return xobject(value, key, target)
+        let objx = new Objext()
+        objx.$define('$$__key', key)
+        objx.$define('$$__parent', target)
+        objx.$enhance('$$__data', () => target.$$__data[key])
+        objx.$put(value)
+        return objx
       }
       else if (isArray(value)) {
         return xarray(value, key, target)
@@ -155,36 +161,12 @@ export class Objext {
       }
     }
 
-    function xobject(value, key, target) {
-      let objx = new Objext()
-
-      objx.$define('$$__key', key)
-      objx.$define('$$__parent', target)
-
-      if (!target.$$__data[key]) {
-        target.$$__data[key] = {}
-      }
-
-      // 创建引用，这样当修改子节点的时候，父节点自动修改
-      objx.$enhance('$$__data', () => target.$$__data[key])
-      objx.$enhance('$$locked', () => target.$$locked)
-
-      objx.$put(value)
-
-      return objx
-    }
-
     function xarray(value, key, target) {
-      let objx = []
+      let xarr = []
 
       let prototypes = Objext.prototype
       //  创建一个proto作为一个数组新原型，这个原型的push等方法经过改造
       let proto = []
-
-      // 创建引用，这样当修改子节点的时候，父节点自动修改
-      if (!target.$$__data[key]) {
-        target.$$__data[key] = []
-      }
 
       // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
       let descriptors = {
@@ -197,9 +179,6 @@ export class Objext {
         $$__data: {
           get: () => target.$$__data[key],
         },
-        $$locked: {
-          get: () => target.$$locked,
-        },
         $$__listeners: {
           value: [],
         },
@@ -207,13 +186,25 @@ export class Objext {
           value: [],
         },
         $dispatch: {
-          value: prototypes.$dispatch.bind(objx),
+          value: prototypes.$dispatch.bind(xarr),
         },
         $validate: {
-          value: prototypes.$validate.bind(objx),
+          value: prototypes.$validate.bind(xarr),
+        },
+        $isLocked: {
+          value: prototypes.$isLocked.bind(xarr),
+        },
+        $isSlient: {
+          value: prototypes.$isSlient.bind(xarr),
         },
         $$__inited: {
           value: true,
+        },
+        valueOf: {
+          value: prototypes.valueOf.bind(xarr),
+        },
+        toString: {
+          value: prototypes.toString.bind(xarr),
         },
       }
 
@@ -221,13 +212,13 @@ export class Objext {
       methods.forEach((method) => {
         descriptors[method] = {
           value: function(...args) {
-            if (target.$$locked) {
-              return
+            if (this.$isLocked()) {
+              return this
             }
 
             // 这里注意：数组的这些方法没有校验逻辑，因为你不知道这些方法到底要对那个元素进行修改
 
-            let oldData = clone(target.$$__data)
+            let oldData = target.valueOf()
 
             // 这里需要处理当...args里面包含了计算属性的问题
             Array.prototype[method].call(target.$$__data[key], ...clone(args))
@@ -239,7 +230,7 @@ export class Objext {
               xdefine(this, i , item)
             })
 
-            let newData = clone(target.$$__data)
+            let newData = target.valueOf()
             target.$dispatch(key, newData, oldData)
           }
         }
@@ -247,13 +238,13 @@ export class Objext {
 
       Object.defineProperties(proto, descriptors)
       // 用proto作为数组的原型
-      setProto(objx, proto)
+      setProto(xarr, proto)
 
       value.forEach((item, i) => {
-        xdefine(objx, i, item)
+        xdefine(xarr, i, item)
       })
 
-      return objx
+      return xarr
     }
 
     // 数据校验
@@ -267,17 +258,16 @@ export class Objext {
     let node = this
 
     for (let i = 0, len = chain.length; i < len; i ++) {
-      let current = chain[i]
+      let touch = chain[i]
       let next = chain[i + 1] || key
-      if (/^[0-9]+$/.test(next) && !isArray(node[current])) {
-        xdefine(node, current, [])
+      if (/^[0-9]+$/.test(next) && !isArray(node[touch])) {
+        xdefine(node, touch, [])
       }
-      else if (!isObject(node[current])) {
-        xdefine(node, current, {})
+      else if (!isObject(node[touch])) {
+        xdefine(node, touch, {})
       }
-      node = node[current]
+      node = node[touch]
     }
-
 
     xdefine(node, key, value)
 
@@ -295,7 +285,7 @@ export class Objext {
    * @param {*} path
    */
   $remove(path) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
@@ -357,15 +347,15 @@ export class Objext {
    * @param {*} data 要设置的数据
    */
   $put(data) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
     // 先把当前视图的所有数据删掉
     let keys = Object.keys(this)
-    let current = this.$$__data
+    let currentData = this.$$__data
     keys.forEach((key) => {
-      delete current[key]
+      delete currentData[key]
       delete this[key]
     })
 
@@ -389,7 +379,7 @@ export class Objext {
    * @param {*} data
    */
   $update(data) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
@@ -407,7 +397,10 @@ export class Objext {
           key,
           getter: descriptor.get,
         })
-        assign(this.$$__data, key, data[key]) // 把初始化结果先放在$$__data上，这样后面到依赖搜集过程才不会报错
+
+        // 把初始化结果先放在$$__data上，这样后面到依赖搜集过程才不会报错
+        // 但它不是最终值（缓存），而只是一个初始值，最终值要等待依赖收集执行完毕
+        assign(this.$$__data, key, data[key])
       }
       // 普通属性
       else {
@@ -436,11 +429,26 @@ export class Objext {
 
   /**
    * 是否禁止触发watch回调，以安静模式更新数据
-   * @param {*} is 为true表示启用安静模式，执行完一些操作之后，要使用false关闭安静模式，否则永远都无法触发watch回调
+   * @param {*} status 为true表示启用安静模式，执行完一些操作之后，要使用false关闭安静模式，否则永远都无法触发watch回调
    */
-  $slient(is) {
-    this.$define('$$slient', !!is)
+  $slient(status) {
+    this.$define('$$__slient', !!status)
     return this
+  }
+  $isSlient() {
+    if (this.$$__slient) {
+      return true
+    }
+
+    let parent = this.$$__parent
+    while (parent) {
+      if (parent.$$__slient) {
+        return true
+      }
+      parent = parent.$$__parent
+    }
+
+    return false
   }
   /**
    * 开启批量更新模式
@@ -461,7 +469,7 @@ export class Objext {
     this.$$__batch.length = 0
 
     // 不再触发dispatch操作
-    if (!this.$$slient) {
+    if (!this.$isSlient()) {
       // 把收集到的变动集中起来，去重，得到最小集
       const batch = {}
       batches.forEach(({ path, newData, oldData }) => {
@@ -518,10 +526,10 @@ export class Objext {
       return false
     }
 
-    let callback = () => {
-      let oldData = this.$$__data
+    let callback = ({ path, oldValue, newValue }) => {
+      let oldData = this.valueOf()
       this.$__compute(key, getter)
-      let newData = this.$$__data
+      let newData = this.valueOf()
       this.$dispatch(key, newData, oldData)
     }
     this.$$__deps.push({ key, dependency, getter, callback })
@@ -621,7 +629,7 @@ export class Objext {
       return this
     }
 
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
@@ -631,7 +639,7 @@ export class Objext {
       return this
     }
 
-    if (this.$$slient) {
+    if (this.$isSlient()) {
       return this
     }
 
@@ -720,7 +728,7 @@ export class Objext {
    * 创建一个快照，使用reset可以恢复这个快照
    */
   $commit(tag) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
@@ -731,8 +739,8 @@ export class Objext {
     let data = this.valueOf()
     let snapshots = this.$$__snapshots
     let i = snapshots.findIndex(item => item.tag === tag)
-    let listeners = this.$$__listeners
-    let deps = this.$$__deps
+    let listeners = [].concat(this.$$__listeners)
+    let deps = [].concat(this.$$__deps)
     let item = {
       tag,
       data,
@@ -747,11 +755,16 @@ export class Objext {
       snapshots.push(item)
     }
 
-    let next = clone(data)
     this.$define('$$__data', {})
-    this.$put(next)
-    this.$define('$$__listeners', listeners)
-    this.$define('$$__deps', deps)
+    this.$put(clone(data))
+    this.$define('$$__listeners', [].concat(listeners))
+    this.$define('$$__deps', [].concat(deps))
+
+    // 还原计算属性
+    deps.forEach((item) => {
+      let { key, getter } = item
+      this.$describe(key, getter)
+    })
 
     return this
   }
@@ -759,15 +772,16 @@ export class Objext {
    * 将数据恢复到快照的内容
    */
   $reset(tag) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
     let snapshots = this.$$__snapshots
     let item = null
 
+    // 不传的时候，恢复到上一个快照
     if (tag === undefined) {
-      item = snapshots[0]
+      item = snapshots[snapshots.length - 1]
     }
     else {
       item = snapshots.find(item => item.tag === tag)
@@ -778,11 +792,17 @@ export class Objext {
     }
 
     let { data, listeners, deps } = item
-    let next = clone(data)
+
     this.$define('$$__data', {})
-    this.$put(next)
-    this.$define('$$__listeners', listeners)
-    this.$define('$$__deps', deps)
+    this.$put(clone(data))
+    this.$define('$$__listeners', [].concat(listeners))
+    this.$define('$$__deps', [].concat(deps))
+
+    // 还原计算属性
+    deps.forEach((item) => {
+      let { key, getter } = item
+      this.$describe(key, getter)
+    })
 
     return this
   }
@@ -792,13 +812,15 @@ export class Objext {
    * @param {*} tag
    */
   $revert(tag) {
-    if (this.$$locked) {
+    if (this.$isLocked()) {
       return this
     }
 
     let snapshots = this.$$__snapshots
+
+    // 不传tag，删除上一个快照
     if (tag === undefined) {
-      snapshots.length = 0
+      snapshots.length -= 1
     }
     else {
       snapshots.forEach((item, i) => {
@@ -815,15 +837,30 @@ export class Objext {
    * 锁定数据，无法做任何操作
    */
   $lock() {
-    this.$define('$$locked', true)
+    this.$define('$$__locked', true)
     return this
   }
   /**
    * 解锁
    */
   $unlock() {
-    this.$define('$$locked', false)
+    this.$define('$$__locked', false)
     return this
+  }
+  $isLocked() {
+    if (this.$$__locked) {
+      return true
+    }
+
+    let parent = this.$$__parent
+    while (parent) {
+      if (parent.$$__locked) {
+        return true
+      }
+      parent = parent.$$__parent
+    }
+
+    return false
   }
 
   /**
@@ -906,15 +943,6 @@ export class Objext {
       }
     }
 
-    // 向上冒泡
-    // let parent = this.$$__parent
-    // let key = this.$$__key
-    // if (parent && parent.$validate) {
-    //   let fullPath = key + '.' + path
-    //   let finalPath = makeKeyPath(makeKeyChain(fullPath))
-    //   parent.$validate(finalPath, next)
-    // }
-
     // 向下传递
     // 仅传了keyPath不传next的情况下才向下传递
     if (argsLen === 1 && !isEmptyKeyPath) {
@@ -928,24 +956,6 @@ export class Objext {
       }
     }
 
-    // 如果全部校验器都是异步的，那么返回一个promise
-    // if (deferers.length === validators.length && validators.length) {
-    //   let i = 0
-    //   const run = (result) => {
-    //     if (result instanceof Error) {
-    //       return result
-    //     }
-
-    //     let deferer = deferers[i]
-    //     if (!deferer) {
-    //       return result
-    //     }
-
-    //     return deferer.then(run).catch(run)
-    //   }
-    //   return run(result)
-    // }
-
     return result
   }
 
@@ -953,14 +963,51 @@ export class Objext {
    * 基于当前对象，克隆出一个新对象
    */
   $clone() {
-    let value = this.$$__data
-    return new Objext(value)
+    let value = this.valueOf()
+    let objx = new Objext()
+    let listeners = this.$$__listeners
+    let deps = this.$$__deps
+
+    objx.$put(value)
+    objx.$define('$$__listeners', [].concat(listeners))
+    objx.$define('$$__deps', [].concat(deps))
+
+    // 还原计算属性
+    deps.forEach((item) => {
+      let { key, getter } = item
+      this.$describe(key, getter)
+    })
+
+    return objx
+  }
+  $destory() {
+    this.$define('$$__snapshots', [])
+    this.$define('$$__validators', [])
+    this.$define('$$__listeners', [])
+
+    this.$define('$$__data', {})
+
+    this.$define('$$hash', '')
+
+    this.$define('$$__dep', {})
+    this.$define('$$__deps', [])
+
+    this.$define('$$__parent', null)
+    this.$define('$$__key', '')
+
+    this.$define('$$__slient', false)
+    this.$define('$$__locked', false)
+    this.$define('$$__inited', false)
+    this.$define('$$__isBatchUpdate', false)
+    this.$define('$$__batch', [])
+
+    this.$put({})
   }
   valueOf() {
-    return valueOf(this.$$__data)
+    return valueOf(this)
   }
   toString() {
-    return stringify(this.valueOf())
+    return JSON.stringify(this.valueOf())
   }
 }
 

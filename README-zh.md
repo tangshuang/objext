@@ -106,10 +106,11 @@ objx.$watch('body.head.hair', (e, newValue, oldValue) => {
 - oldValue: 老数据
 - newValue: 新数据
 - path: 被修改的属性的path信息
-- key: watch的第一个参数
-- target: 被监听到的属性所属的对象
+- match: watch的第一个参数，即当前匹配到的watcher的path值
+- target: 被监听到的属性所属的objext对象
 - preventDefault(): 放弃剩下的所有监听回调
 - stopPropagation(): 禁止冒泡，Objext的监听采取冒泡模式，当一个节点的属性发生变化时，先是这个节点的watcher被激活，然后往它的父级不断广播，直到最顶层
+- stack: 调用栈，可以大致了解调用过程，当然，通过stack定位之后，最好还是用浏览器的开发者工具来调试
 
 如果你嫌麻烦，可以这样做更舒服：
 
@@ -118,8 +119,6 @@ objx.$watch('body.head.hair', ({ oldValue, newValue }) => {
   // 这样更舒服吧
 })
 ```
-
-需要注意的是，使用`$put`方法全量更新数据时，不会触发任何watcher。
 
 **deep**
 
@@ -199,14 +198,20 @@ _validators_是一个数组，里面包含了所有校验器配置信息，每�
   validate: value => Boolean, // 校验函数，返回boolean值
   message: '格式不对', // 校验失败时返回的错误message信息
   warn: error => {}, // 校验失败后要执行的函数，error包含了message信息，另外还包含value和path信息
+  deferred: true, // 是否异步校验，异步校验不会中断校验过程，从当前进程中脱离出去，而是交给异步进程去处理，这种情况下，你必须传warn来获得错误信息
 }
 ```
 
 所有的校验器被放在一个队列里。在校验时，一个校验器未通过失败时，就不会往下继续校验了。
 
-### $validate()
+### $validate(path, next)
 
-一次性校验所有数据，校验器队列会被依次运行。
+校验数据，校验器队列会被依次运行。
+
+- path: 运行通过$formulate设置的path为该值的校验器。如果不传或传null，将会一次性校验所有数据。
+- next: 在传了path的情况下生效，当传入next的时候，表示不是对现在已经在objext中的数据进行校验，而是用path对应的校验器去检查一个值，看这个值是否符合校验规则，只有在符合校验规则的情况下，才能写入值
+
+校验数据的时候有一个规则，假如path对应的值是一个objext实例，校验器会自动运行这个objext实例的所有校验器，也就是说，校验一个path，会把这个path下所有的校验规则都过一遍。
 
 ## 数据锁
 
@@ -229,8 +234,8 @@ console.log(objx.name) // => 'tomy'
 
 解锁数据。
 
-## 其他
 
+## 链式操作
 Objext的实例可以链式操作：
 
 ```js
@@ -238,6 +243,8 @@ objx.$slient(true).$set('name', 'lily').$slient(false)
 ```
 
 这行代码可以不触发watch的情况下更新name属性。
+
+## 其他接口
 
 另外，为了更方便的使用，Objext提供了几个方法。
 
@@ -278,6 +285,13 @@ objx.$batchEnd()
 
 上面的代码中，执行了多次$set，但是，所有的变动的回调会在$batchEnd的时候才执行，每一个属性对应的回调只会执行一次，因此body.main的变动会被视为一次，最终的新值是right，它的回调只会执行一次。
 
+### $describe(key, getter)
+
+设置一个计算属性。
+
+- key: 要设置的属性名。注意，不支持keyPath方式，因为计算属性相对于当前对象。
+- getter: getter函数。
+
 ### $depend(target, targetPath, seflPath)
 
 绑定其他objext实例。
@@ -305,6 +319,10 @@ objx1.$depend(objx2, 'age', 'age')
 ### $clone()
 
 基于当前数据，克隆出一个新的Objext对象，在保持数据相同的情况下，和原对象没有任何关系。
+
+### $destory()
+
+销毁当前实例，释放内存。
 
 ### $$hash
 

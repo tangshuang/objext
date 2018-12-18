@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<title>测试版本控制</title>
+
+<div>
+  <p id="text"></p>
+  <p>
+    年龄：<input type="number" value="" id="input" />
+  </p>
+  <p>
+    <button id="commit">创建版本</button>
+    <button id="reset">恢复版本</button>
+  </p>
+</div>
+
+<script src="../dist/objext.js"></script>
+<script>
+const { Objext } = window.objext
+const origin = {
+  name: 'tomy',
+  age: 10,
+  get info() {
+    return this.name + ': ' + this.age
+  },
+}
+const objx = new Objext(origin)
+
+function render() {
+  let info = objx.info
+  let age = objx.age
+  document.querySelector('#text').innerHTML = info
+  document.querySelector('#input').value = age
+}
+
+document.querySelector('#input').addEventListener('input', (e) => {
+  let value = e.target.value
+  objx.age = value
+  render()
+})
+
+document.querySelector('#commit').addEventListener('click', () => {
+  objx.$commit('version')
+  render()
+})
+
+document.querySelector('#reset').addEventListener('click', () => {
+  objx.$reset('version')
+  render()
+})
+
+render()
+</script>
