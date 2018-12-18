@@ -629,20 +629,23 @@ export class Objext {
   }
   /**
    * 校验数据
-   * @param {*} path 可选，不传时校验所有规则
+   * @param {*} keyPath 可选，不传时校验所有规则
    * @param {*} next 可选，用该值作为备选值校验，在$set新值之前对该新值做校验时使用
    * @return {Error} 一个Error的实例，message是校验器中设置的，同时，它附带两个属性（value, path），并且它会被传给校验器中的warn函数
    */
-  $validate(path, next) {
+  $validate(keyPath, next) {
+    let isEmptyKeyPath = keyPath === undefined || keyPath === null
     let result = null
-    let validators = this.$$__validators.filter(item => path === undefined || path === null || item.path === path) // path不传的时候，校验全部验证规则
+    let validators = this.$$__validators.filter(item => isEmptyKeyPath || item.path === keyPath) // keyPath不传的时候，校验全部验证规则
     let deferers = []
+    let argsLen = arguments.length
 
     const createError = ({ path, value, message, warn }) => {
       let error = new Error(message)
       Object.defineProperties(error, {
         value: { value },
         path: { value: path },
+        target: { value: this }
       })
       if (isFunction(warn)) {
         warn.call(this, error)
@@ -656,7 +659,8 @@ export class Objext {
         continue
       }
       let { validate, message, warn, path, determine, deferred } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
-      let value = arguments.length === 2 && arguments[0] !== undefined && arguments[0] !== null ? next : parse(this.$$__data, path)
+      let key = path === '*' || isEmpty(path) ? '' : path
+      let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this.$$__data, key)
 
       // 某些情况下不检查该字段
       if (isFunction(determine) && !determine.call(this, value)) {
@@ -685,31 +689,44 @@ export class Objext {
     }
 
     // 向上冒泡
-    let parent = this.$$__parent
-    let key = this.$$__key
-    if (parent && parent.$validate) {
-      let fullPath = key + '.' + path
-      let finalPath = makeKeyPath(makeKeyChain(fullPath))
-      parent.$validate(finalPath, next)
+    // let parent = this.$$__parent
+    // let key = this.$$__key
+    // if (parent && parent.$validate) {
+    //   let fullPath = key + '.' + path
+    //   let finalPath = makeKeyPath(makeKeyChain(fullPath))
+    //   parent.$validate(finalPath, next)
+    // }
+
+    // 向下传递
+    // 仅传了keyPath不传next的情况下才向下传递
+    if (argsLen === 1 && !isEmptyKeyPath) {
+      let key = keyPath === '*' ? '' : keyPath
+      let child = parse(this.$$__data, key)
+      if (isInstanceOf(child, Objext)) {
+        let res = child.$validate() // 向下传递的时候，就全量校验
+        if (isInstanceOf(res, Error)) {
+          result = res
+        }
+      }
     }
 
     // 如果全部校验器都是异步的，那么返回一个promise
-    if (deferers.length === validators.length && validators.length) {
-      let i = 0
-      const run = (result) => {
-        if (result instanceof Error) {
-          return result
-        }
+    // if (deferers.length === validators.length && validators.length) {
+    //   let i = 0
+    //   const run = (result) => {
+    //     if (result instanceof Error) {
+    //       return result
+    //     }
 
-        let deferer = deferers[i]
-        if (!deferer) {
-          return result
-        }
+    //     let deferer = deferers[i]
+    //     if (!deferer) {
+    //       return result
+    //     }
 
-        return deferer.then(run).catch(run)
-      }
-      return run(result)
-    }
+    //     return deferer.then(run).catch(run)
+    //   }
+    //   return run(result)
+    // }
 
     return result
   }
