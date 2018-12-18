@@ -7,6 +7,7 @@ import {
   inArray,
   isInstanceOf,
   isEmpty,
+  setProto,
   makeKeyPath,
   makeKeyChain,
   parse,
@@ -15,10 +16,9 @@ import {
   getStringHashcode,
   defineProperty,
   defineProperties,
+  stringify,
+  valueOf,
 } from './utils'
-import {
-  xset,
-} from './helpers'
 
 export class Objext {
   constructor(data) {
@@ -81,7 +81,7 @@ export class Objext {
    * @param {*} path
    */
   $get(path) {
-    return parse(this.valueOf(), path)
+    return parse(this.$$__data, path)
   }
   /**
    * 设置一个普通值属性
@@ -93,13 +93,193 @@ export class Objext {
       return this
     }
 
+    function xdefine(target, key, value) {
+      let data = xcreate(value, key, target)
+      let $$ = data
+
+      Object.defineProperty(target, key, {
+        configurable : true,
+        enumerable : true,
+        set: (v) => {
+          if (target.$$locked) {
+            return
+          }
+
+          // 校验数据
+          // 会冒泡上去
+          target.$validate(key, v)
+
+          let oldData = clone(target.$$__data)
+          let data = xcreate(v, key, target)
+          $$ = data
+
+          // 直接更新数据
+          assign(target.$$__data, key, v)
+
+          // 触发watch
+          // 会冒泡上去
+          let newData = clone(target.$$__data)
+          target.$dispatch(key, newData, oldData)
+        },
+        get() {
+          /**
+           * 这里需要详细解释一下
+           * 由于依赖收集中$$__dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
+           * 但是，由于在进行监听时，deep为true，因此，即使是只有顶层属性被监听，当顶层属性的深级属性变动时，这个监听也会被触发，因此也能带来依赖响应
+           */
+          if (target.$$__dep && target.$$__dep.key && target.$$__dep.getter) {
+            target.$$__dep.dependency = key
+            target.$$__dep.target = target
+            target.$__collect()
+          }
+
+          return $$
+        },
+      })
+    }
+
+    function xcreate(value, key, target) {
+      if (isInstanceOf(value, Objext)) {
+        value.$define('$$__key', key)
+        value.$define('$$__parent', target)
+        return value
+      }
+      else if (isObject(value)) {
+        return xobject(value, key, target)
+      }
+      else if (isArray(value)) {
+        return xarray(value, key, target)
+      }
+      else {
+        return value
+      }
+    }
+
+    function xobject(value, key, target) {
+      let objx = new Objext()
+
+      objx.$define('$$__key', key)
+      objx.$define('$$__parent', target)
+
+      if (!target.$$__data[key]) {
+        target.$$__data[key] = {}
+      }
+
+      // 创建引用，这样当修改子节点的时候，父节点自动修改
+      objx.$enhance('$$__data', () => target.$$__data[key])
+      objx.$enhance('$$locked', () => target.$$locked)
+
+      objx.$put(value)
+
+      return objx
+    }
+
+    function xarray(value, key, target) {
+      let objx = []
+
+      let prototypes = Objext.prototype
+      //  创建一个proto作为一个数组新原型，这个原型的push等方法经过改造
+      let proto = []
+
+      // 创建引用，这样当修改子节点的时候，父节点自动修改
+      if (!target.$$__data[key]) {
+        target.$$__data[key] = []
+      }
+
+      // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
+      let descriptors = {
+        $$__key: {
+          value: key,
+        },
+        $$__parent: {
+          value: target,
+        },
+        $$__data: {
+          get: () => target.$$__data[key],
+        },
+        $$locked: {
+          get: () => target.$$locked,
+        },
+        $$__listeners: {
+          value: [],
+        },
+        $$__validators: {
+          value: [],
+        },
+        $dispatch: {
+          value: prototypes.$dispatch.bind(objx),
+        },
+        $validate: {
+          value: prototypes.$validate.bind(objx),
+        },
+        $$__inited: {
+          value: true,
+        },
+      }
+
+      let methods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']
+      methods.forEach((method) => {
+        descriptors[method] = {
+          value: function(...args) {
+            if (target.$$locked) {
+              return
+            }
+
+            // 这里注意：数组的这些方法没有校验逻辑，因为你不知道这些方法到底要对那个元素进行修改
+
+            let oldData = clone(target.$$__data)
+
+            // 这里需要处理当...args里面包含了计算属性的问题
+            Array.prototype[method].call(target.$$__data[key], ...clone(args))
+            Array.prototype[method].call(this, ...args)
+
+            // TODO: 根据不同类型的操作判断是否要重新xdefine
+            this.forEach((item, i) => {
+              // 调整元素的path信息，该元素的子元素path也会被调整
+              xdefine(this, i , item)
+            })
+
+            let newData = clone(target.$$__data)
+            target.$dispatch(key, newData, oldData)
+          }
+        }
+      })
+
+      Object.defineProperties(proto, descriptors)
+      // 用proto作为数组的原型
+      setProto(objx, proto)
+
+      value.forEach((item, i) => {
+        xdefine(objx, i, item)
+      })
+
+      return objx
+    }
+
     // 数据校验
     // 校验过程不中断下方的赋值，如果想要中断，可以在warn里面使用throw new Error
     this.$validate(path, value)
 
     let oldData = this.valueOf()
 
-    xset(this, path, value)
+    let chain = makeKeyChain(path)
+    let key = chain.pop()
+    let node = this
+
+    for (let i = 0, len = chain.length; i < len; i ++) {
+      let current = chain[i]
+      let next = chain[i + 1] || key
+      if (/^[0-9]+$/.test(next) && !isArray(node[current])) {
+        xdefine(node, current, [])
+      }
+      else if (!isObject(node[current])) {
+        xdefine(node, current, {})
+      }
+      node = node[current]
+    }
+
+
+    xdefine(node, key, value)
 
     let newData = this.valueOf()
 
@@ -139,6 +319,15 @@ export class Objext {
       delete node[key]
     }
 
+    // 把计算属性的计算规则删掉
+    this.$$__deps.forEach((item, i) => {
+      if (item.key === path) {
+        this.$unwatch(item.dependency, item.callback)
+        this.$$__deps.splice(i, 1)
+      }
+      // 注意，这里没有删除其他对这个path属性有依赖的watchers，因为我们可以用$set添加这个属性，添加可以引起其他依赖这个属性的属性的变化
+    })
+
     let newData = this.valueOf()
     this.$dispatch(path, newData, oldData)
 
@@ -164,7 +353,7 @@ export class Objext {
   }
 
   /**
-   * 全量更新数据，老数据会被删除
+   * 全量更新数据，老数据会被删除，原有的计算属性依赖关系会被清除
    * @param {*} data 要设置的数据
    */
   $put(data) {
@@ -179,6 +368,13 @@ export class Objext {
       delete current[key]
       delete this[key]
     })
+
+    // 把计算属性的计算规则删掉
+    this.$$__deps.forEach((item) => {
+      this.$unwatch(item.dependency, item.callback)
+    })
+    // 把计算属性的依赖关系删掉
+    this.$$__deps.length = 0
 
     // 把数据塞进去
     this.$update(data)
@@ -202,20 +398,24 @@ export class Objext {
 
     this.$batchStart()
 
+    // 下面这个forEach结束后，可以得到一个完整的$$__data，但是它上面保存着初始值，计算属性的值还需要进一步进行计算后得出
     keys.forEach((key) => {
       let descriptor = Object.getOwnPropertyDescriptor(data, key)
+      // 计算属性
       if (descriptor.get) {
         getters.push({
           key,
           getter: descriptor.get,
         })
+        assign(this.$$__data, key, data[key]) // 把初始化结果先放在$$__data上，这样后面到依赖搜集过程才不会报错
       }
+      // 普通属性
       else {
         this.$set(key, data[key])
       }
     })
 
-    // 设置计算属性
+    // 第一次实例化objext时，$describe只是为当前实例设置了这些计算属性，要等到下面到才会真正创建值（缓存）
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
     })
@@ -226,14 +426,13 @@ export class Objext {
     // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误，因此，必须将$$__inited设置为false，阻止计算属性初始化操作
     this.$define('$$__inited', true)
 
-    // 依赖初始化值
+    // 计算计算属性的最终值（缓存），并且在过程中实现依赖收集
     getters.forEach((item) => {
       this.$__compute(item.key, item.getter)
     })
 
     return this
   }
-
 
   /**
    * 是否禁止触发watch回调，以安静模式更新数据
@@ -288,6 +487,7 @@ export class Objext {
    * @param {*} getter
    */
   $describe(key, getter) {
+    // 直接从$$__data上读取缓存
     Object.defineProperty(this, key, {
       configurable: true,
       enumerable : true,
@@ -297,14 +497,20 @@ export class Objext {
       },
     })
 
-    // 依赖收集
+    // 计算该属性的值，并patch到$__data上，并且，这个过程中实现了依赖收集
     this.$__compute(key, getter)
+
     return this
   }
   /**
-   * 依赖收集
+   * 收集属性
    */
   $__collect() {
+    // 仅在已经初始化好的objext上执行计算
+    if (!this.$$__inited) {
+      return;
+    }
+
     let { getter, key, dependency, target } = this.$$__dep
 
     // 已经收集过了，就不再进行收集
@@ -313,19 +519,24 @@ export class Objext {
     }
 
     let callback = () => {
-      let oldData = this.valueOf()
+      let oldData = this.$$__data
       this.$__compute(key, getter)
-      let newData = this.valueOf()
+      let newData = this.$$__data
       this.$dispatch(key, newData, oldData)
     }
-    this.$$__deps.push({ key, dependency, getter })
+    this.$$__deps.push({ key, dependency, getter, callback })
     target.$watch(dependency, callback, true)
     return true
   }
   /**
-   * 依赖计算赋值
+   * 计算属性
    */
   $__compute(key, getter) {
+    // 仅在已经初始化好的objext上执行计算
+    if (!this.$$__inited) {
+      return;
+    }
+
     // 不传getter，则用现有的getter重新计算
     if (getter === undefined) {
       let item = this.$$__deps.find(item => item.key === key)
@@ -336,9 +547,8 @@ export class Objext {
     }
 
     this.$define('$$__dep', { key, getter })
-    let data = this.$$__data
     let newValue = getter.call(this)
-    assign(data, key, newValue)
+    assign(this.$$__data, key, newValue)
     this.$define('$$__dep', {})
     return newValue
   }
@@ -361,7 +571,7 @@ export class Objext {
   $depend(target, targetPath, key) {
     target.$watch(targetPath, ({ newValue, oldValue }) => {
       if (!isEqual(newValue, oldValue)) {
-        this.$__compute(key)
+        this.$__compute(key) // 更新缓存
       }
     })
   }
@@ -520,22 +730,28 @@ export class Objext {
 
     let data = this.valueOf()
     let snapshots = this.$$__snapshots
-    let i = snapshots.findIndex(item => item.tag === tag);
+    let i = snapshots.findIndex(item => item.tag === tag)
+    let listeners = this.$$__listeners
+    let deps = this.$$__deps
+    let item = {
+      tag,
+      data,
+      listeners,
+      deps,
+    }
+
     if (i > -1) {
-      snapshots[i] = {
-        tag,
-        data,
-      }
+      snapshots[i] = item
     }
     else {
-      snapshots.push({
-        tag,
-        data,
-      })
+      snapshots.push(item)
     }
 
     let next = clone(data)
-    this.$define('$$__data', next)
+    this.$define('$$__data', {})
+    this.$put(next)
+    this.$define('$$__listeners', listeners)
+    this.$define('$$__deps', deps)
 
     return this
   }
@@ -547,24 +763,26 @@ export class Objext {
       return this
     }
 
-    let data = null
     let snapshots = this.$$__snapshots
+    let item = null
 
     if (tag === undefined) {
-      data = snapshots[0]
+      item = snapshots[0]
     }
     else {
-      let item = snapshots.find(item => item.tag === tag)
-      data = item.data
+      item = snapshots.find(item => item.tag === tag)
     }
 
-    if (!data) {
+    if (!item) {
       return this
     }
 
+    let { data, listeners, deps } = item
     let next = clone(data)
     this.$define('$$__data', {})
     this.$put(next)
+    this.$define('$$__listeners', listeners)
+    this.$define('$$__deps', deps)
 
     return this
   }
@@ -642,10 +860,10 @@ export class Objext {
 
     const createError = ({ path, value, message, warn }) => {
       let error = new Error(message)
-      Object.defineProperties(error, {
-        value: { value },
-        path: { value: path },
-        target: { value: this }
+      defineProperties(error, {
+        value,
+        path,
+        target: this,
       })
       if (isFunction(warn)) {
         warn.call(this, error)
@@ -739,30 +957,10 @@ export class Objext {
     return new Objext(value)
   }
   valueOf() {
-    const isObj = obj => isObject(obj) || isArray(obj) || isInstanceOf(obj, Objext)
-    const valueOf = (obj) => {
-      if (isObj(obj)) {
-        let result = isArray(obj) ? [] : {}
-        obj = isInstanceOf(obj, Objext) ? obj.$$__data : obj
-        for (let key in obj) {
-          let value = obj[key]
-          if (isObj(value)) {
-            result[key] = valueOf(value)
-          }
-          else {
-            result[key] = value
-          }
-        }
-        return result
-      }
-      else {
-        return obj
-      }
-    }
     return valueOf(this.$$__data)
   }
   toString() {
-    return JSON.stringify(this.valueOf())
+    return stringify(this.valueOf())
   }
 }
 

@@ -1,3 +1,5 @@
+import Objext from './objext'
+
 /**
  * 浅遍历对象
  * @param {*} data
@@ -198,7 +200,7 @@ export function isEmpty(value) {
 }
 
 export function isEqual(val1, val2) {
-  function equal(obj1, obj2) {
+  const equal = (obj1, obj2) => {
     let keys1 = Object.keys(obj1)
     let keys2 = Object.keys(obj2)
     let keys = unionArray(keys1, keys2)
@@ -223,7 +225,10 @@ export function isEqual(val1, val2) {
     return true
   }
 
-  if (isObject(val1) && isObject(val2)) {
+  if (isInstanceOf(val1, Objext) && isInstanceOf(val2, Objext)) {
+    return val1.$$hash === val2.$$hash
+  }
+  else if (isObject(val1) && isObject(val2)) {
     return equal(val1, val2)
   }
   else if (isArray(val1) && isArray(val2)) {
@@ -269,17 +274,17 @@ export function inheritOf(obj) {
  * @param {*} obj
  */
 export function valueOf(obj) {
-  if (obj && typeof obj === 'object') {
+  const isObj = obj => isObject(obj) || isArray(obj) || isInstanceOf(obj, Objext)
+  if (isObj(obj)) {
     let result = isArray(obj) ? [] : {}
-    for (let key in obj) {
-      let value = obj[key]
-      if (value && typeof value === 'object') {
+    each(obj, (value, key) => {
+      if (isObj(value)) {
         result[key] = valueOf(value)
       }
       else {
         result[key] = value
       }
-    }
+    })
     return result
   }
   else {

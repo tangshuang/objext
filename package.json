@@ -9,6 +9,7 @@
   "scripts": {
     "prepublishOnly": "npm test && npm run build",
     "build": "webpack",
+    "watch": "webpack --watch",
     "test": "jest"
   },
   "repository": {
