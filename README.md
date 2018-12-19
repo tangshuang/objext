@@ -309,12 +309,12 @@ objx.$batchEnd()
 
 Clone current objext instance to a new objext instance.
 
-### $$hash
+### $hash
 
 A identity of current objext instance, you can it to compare two objext instances:
 
 ```js
-if (objx1.$$hash === objx2.$$hash) {
+if (objx1.$hash === objx2.$hash) {
   // ...
 }
 ```

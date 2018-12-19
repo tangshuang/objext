@@ -7,6 +7,7 @@ import {
   inArray,
   isInstanceOf,
   isEmpty,
+  uniqueArray,
   setProto,
   makeKeyPath,
   makeKeyChain,
@@ -21,29 +22,30 @@ import {
 
 export class Objext {
   constructor(sources) {
-    this.$define('$$__snapshots', [])
-    this.$define('$$__validators', [])
-    this.$define('$$__listeners', [])
+    this.$define('$__snapshots', [])
+    this.$define('$__validators', [])
+    this.$define('$__listeners', [])
 
-    this.$define('$$__data', {})
+    this.$define('$__data', {})
 
-    this.$define('$$hash', '')
+    this.$define('$hash', '')
 
-    this.$define('$$__dep', {})
-    this.$define('$$__deps', [])
+    this.$define('$__dep', {})
+    this.$define('$__deps', [])
+    this.$define('$__refers', [])
 
-    this.$define('$$__parent', null)
-    this.$define('$$__key', '')
+    this.$define('$__parent', null)
+    this.$define('$__key', '')
 
-    this.$define('$$__slient', false)
-    this.$define('$$__locked', false)
-    this.$define('$$__strict', false)
+    this.$define('$__slient', false)
+    this.$define('$__locked', false)
+    this.$define('$__strict', false)
 
-    this.$define('$$__inited', false) // 用来记录是否已经塞过数据了
-    this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
-    this.$define('$$__batch', []) // 用来记录批量一次更新的内容
+    this.$define('$__inited', false) // 用来记录是否已经塞过数据了
+    this.$define('$__isBatchUpdate', false) // 记录是否开启批量更新
+    this.$define('$__batch', []) // 用来记录批量一次更新的内容
 
-    this.$define('$$__sources', sources)
+    this.$define('$__sources', sources)
     this.$init(sources)
   }
 
@@ -56,7 +58,7 @@ export class Objext {
     // 每当值发生变化时，hash被更新
     this.$watch('*', ({ newValue, oldValue }) => {
       if (!isEqual(newValue, oldValue)) {
-        this.$define('$$hash', getStringHashcode(this.toString()))
+        this.$define('$hash', getStringHashcode(this.toString()))
       }
     })
   }
@@ -96,7 +98,7 @@ export class Objext {
     }
 
     function xdefine(target, key, value) {
-      assign(target.$$__data, key, valueOf(value)) // 一定要提前设置
+      assign(target.$__data, key, valueOf(value)) // 一定要提前设置
       value = xcreate(value, key, target)
 
       Object.defineProperty(target, key, {
@@ -118,22 +120,22 @@ export class Objext {
           value = xcreate(v, key, target)
 
           // 直接更新数据
-          assign(target.$$__data, key, valueOf(v))
+          assign(target.$__data, key, valueOf(v))
 
           // 触发watch
           // 会冒泡上去
-          let newData = clone(target.$$__data)
+          let newData = clone(target.$__data)
           target.$dispatch(key, newData, oldData)
         },
         get() {
           /**
            * 这里需要详细解释一下
-           * 由于依赖收集中$$__dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
+           * 由于依赖收集中$__dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
            * 但是，由于在进行监听时，deep为true，因此，即使是只有顶层属性被监听，当顶层属性的深级属性变动时，这个监听也会被触发，因此也能带来依赖响应
            */
-          if (target.$$__dep && target.$$__dep.key && target.$$__dep.getter) {
-            target.$$__dep.dependency = key
-            target.$$__dep.target = target
+          if (target.$__dep && target.$__dep.key && target.$__dep.getter) {
+            target.$__dep.dependency = key
+            target.$__dep.target = target
             target.$__collect()
           }
 
@@ -144,18 +146,18 @@ export class Objext {
 
     function xcreate(value, key, target) {
       if (isInstanceOf(value, Objext)) {
-        // 这里需要注意：当把一个objext实例作为子属性值加入另外一个objext的时候，会被修改$$__key和$$__parent，这要求该objext实例是独占的，如果被多处使用，会存在引用错误问题，解决的一种办法是使用$clone(true)创建一个完全备份
+        // 这里需要注意：当把一个objext实例作为子属性值加入另外一个objext的时候，会被修改$__key和$__parent，这要求该objext实例是独占的，如果被多处使用，会存在引用错误问题，解决的一种办法是使用$clone(true)创建一个完全备份
         let objx = value
-        objx.$define('$$__key', key)
-        objx.$define('$$__parent', target)
-        objx.$enhance('$$__data', () => target.$$__data[key])
+        objx.$define('$__key', key)
+        objx.$define('$__parent', target)
+        objx.$enhance('$__data', () => target.$__data[key])
         return objx
       }
       else if (isObject(value)) {
         let objx = new Objext()
-        objx.$define('$$__key', key)
-        objx.$define('$$__parent', target)
-        objx.$enhance('$$__data', () => target.$$__data[key])
+        objx.$define('$__key', key)
+        objx.$define('$__parent', target)
+        objx.$enhance('$__data', () => target.$__data[key])
         objx.$put(value)
         return objx
       }
@@ -176,19 +178,19 @@ export class Objext {
 
       // 下面这些属性都是为了冒泡准备的，array没有$set等设置相关的属性
       let descriptors = {
-        $$__key: {
+        $__key: {
           value: key,
         },
-        $$__parent: {
+        $__parent: {
           value: target,
         },
-        $$__data: {
-          get: () => target.$$__data[key],
+        $__data: {
+          get: () => target.$__data[key],
         },
-        $$__listeners: {
+        $__listeners: {
           value: [],
         },
-        $$__validators: {
+        $__validators: {
           value: [],
         },
         $dispatch: {
@@ -206,7 +208,7 @@ export class Objext {
         $isStrict: {
           value: prototypes.$isStrict.bind(xarr),
         },
-        $$__inited: {
+        $__inited: {
           value: true,
         },
         valueOf: {
@@ -230,7 +232,7 @@ export class Objext {
             let oldData = target.valueOf()
 
             // 这里需要处理当...args里面包含了计算属性的问题
-            Array.prototype[method].call(target.$$__data[key], ...clone(args))
+            Array.prototype[method].call(target.$__data[key], ...clone(args))
             Array.prototype[method].call(this, ...args)
 
             // TODO: 根据不同类型的操作判断是否要重新xdefine
@@ -311,23 +313,30 @@ export class Objext {
 
     if (!chain.length) {
       delete this[key]
-      delete this.$$__data[key]
+      delete this.$__data[key]
     }
     else {
       let target = makeKeyPath(chain)
-      let data = parse(this.$$__data, target)
+      let data = parse(this.$__data, target)
       let node = parse(this, target)
       delete data[key]
       delete node[key]
     }
 
     // 把计算属性的计算规则删掉
-    this.$$__deps.forEach((item, i) => {
+    this.$__deps.forEach((item, i) => {
       if (item.key === path) {
         this.$unwatch(item.dependency, item.callback)
-        this.$$__deps.splice(i, 1)
+        this.$__deps.splice(i, 1)
       }
       // 注意，这里没有删除其他对这个path属性有依赖的watchers，因为我们可以用$set添加这个属性，添加可以引起其他依赖这个属性的属性的变化
+    })
+    // 把计算属性对外部的引用也删除
+    this.$__refers.forEach((item, i) => {
+      if (item.key === path) {
+        item.target.$unwatch(item.path, item.callback)
+        this.$__refers.splice(i, 1)
+      }
     })
 
     let newData = this.valueOf()
@@ -365,24 +374,28 @@ export class Objext {
 
     // 先把当前视图的所有数据删掉
     let keys = Object.keys(this)
-    let currentData = this.$$__data
+    let currentData = this.$__data
     keys.forEach((key) => {
       delete currentData[key]
       delete this[key]
     })
 
     // 把计算属性的计算规则删掉
-    this.$$__deps.forEach((item) => {
+    this.$__deps.forEach((item) => {
       this.$unwatch(item.dependency, item.callback)
     })
-    // 把计算属性的依赖关系删掉
-    this.$$__deps.length = 0
+    this.$__deps.length = 0
+    // 把计算属性对外部的引用也删除
+    this.$__refers.forEach((item) => {
+      item.target.$unwatch(item.path, item.callback)
+    })
+    this.$__refers.length = 0
 
     // 把数据塞进去
     this.$update(data)
 
     // 更新hash
-    this.$define('$$hash', getStringHashcode(this.toString()))
+    this.$define('$hash', getStringHashcode(this.toString()))
 
     return this
   }
@@ -397,11 +410,32 @@ export class Objext {
 
     let keys = Object.keys(data)
     let getters = []
+    let depKeys = this.$__deps.map(item => item.key)
+    depKeys = uniqueArray(depKeys)
 
     this.$batchStart()
 
-    // 下面这个forEach结束后，可以得到一个完整的$$__data，但是它上面保存着初始值，计算属性的值还需要进一步进行计算后得出
+    // 下面这个forEach结束后，可以得到一个完整的$__data，但是它上面保存着初始值，计算属性的值还需要进一步进行计算后得出
     keys.forEach((key) => {
+      // 删除掉和计算属性相关的信息
+      if (inArray(key, depKeys)) {
+        // 把计算属性的计算规则删掉
+        this.$__deps.forEach((item, i) => {
+          if (item.key === key) {
+            this.$unwatch(item.dependency, item.callback)
+            this.$__deps.splice(i, 1)
+          }
+          // 注意，这里没有删除其他对这个path属性有依赖的watchers，因为我们可以用$set添加这个属性，添加可以引起其他依赖这个属性的属性的变化
+        })
+        // 把计算属性对外部的引用也删除
+        this.$__refers.forEach((item, i) => {
+          if (item.key === key) {
+            item.target.$unwatch(item.path, item.callback)
+            this.$__refers.splice(i, 1)
+          }
+        })
+      }
+
       let descriptor = Object.getOwnPropertyDescriptor(data, key)
       // 计算属性
       if (descriptor.get) {
@@ -410,9 +444,9 @@ export class Objext {
           getter: descriptor.get,
         })
 
-        // 把初始化结果先放在$$__data上，这样后面到依赖搜集过程才不会报错
+        // 把初始化结果先放在$__data上，这样后面到依赖搜集过程才不会报错
         // 但它不是最终值（缓存），而只是一个初始值，最终值要等待依赖收集执行完毕
-        assign(this.$$__data, key, valueOf(data[key]))
+        assign(this.$__data, key, valueOf(data[key]))
       }
       // 普通属性
       else {
@@ -427,9 +461,9 @@ export class Objext {
 
     this.$batchEnd()
 
-    // $$__inited为true的情况下，才能进行依赖收集，否则不允许
-    // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误，因此，必须将$$__inited设置为false，阻止计算属性初始化操作
-    this.$define('$$__inited', true)
+    // $__inited为true的情况下，才能进行依赖收集，否则不允许
+    // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误，因此，必须将$__inited设置为false，阻止计算属性初始化操作
+    this.$define('$__inited', true)
 
     // 计算计算属性的最终值（缓存），并且在过程中实现依赖收集
     getters.forEach((item) => {
@@ -444,20 +478,20 @@ export class Objext {
    * @param {*} status 为true表示启用安静模式，执行完一些操作之后，要使用false关闭安静模式，否则永远都无法触发watch回调
    */
   $slient(status) {
-    this.$define('$$__slient', !!status)
+    this.$define('$__slient', !!status)
     return this
   }
   $isSlient() {
-    if (this.$$__slient) {
+    if (this.$__slient) {
       return true
     }
 
-    let parent = this.$$__parent
+    let parent = this.$__parent
     while (parent) {
-      if (parent.$$__slient) {
+      if (parent.$__slient) {
         return true
       }
-      parent = parent.$$__parent
+      parent = parent.$__parent
     }
 
     return false
@@ -467,18 +501,18 @@ export class Objext {
    * 批量更新模式开启后，仅在执行batchEnd方法时才会触发watch回调，这样可以避免在一次批量操作中对同一个path进行了多次watch回调触发
    */
   $batchStart() {
-    this.$define('$$__isBatchUpdate', true)
+    this.$define('$__isBatchUpdate', true)
     return this
   }
   /**
    * 结束批量更新模式
    */
   $batchEnd() {
-    const batches = [].concat(this.$$__batch)
+    const batches = [].concat(this.$__batch)
 
     // 重置信息，需要先重置，否则this.$dispatch不工作
-    this.$define('$$__isBatchUpdate', false)
-    this.$$__batch.length = 0
+    this.$define('$__isBatchUpdate', false)
+    this.$__batch.length = 0
 
     // 不再触发dispatch操作
     if (!this.$isSlient()) {
@@ -507,12 +541,12 @@ export class Objext {
    * @param {*} getter
    */
   $describe(key, getter) {
-    // 直接从$$__data上读取缓存
+    // 直接从$__data上读取缓存
     Object.defineProperty(this, key, {
       configurable: true,
       enumerable : true,
       get: () => {
-        let value = parse(this.$$__data, key)
+        let value = parse(this.$__data, key)
         return value
       },
     })
@@ -527,14 +561,14 @@ export class Objext {
    */
   $__collect() {
     // 仅在已经初始化好的objext上执行计算
-    if (!this.$$__inited) {
+    if (!this.$__inited) {
       return;
     }
 
-    let { getter, key, dependency, target } = this.$$__dep
+    let { getter, key, dependency, target } = this.$__dep
 
     // 已经收集过了，就不再进行收集
-    if (this.$$__deps.find(item => item.key === key && item.dependency === dependency)) {
+    if (this.$__deps.find(item => item.key === key && item.dependency === dependency)) {
       return false
     }
 
@@ -544,7 +578,7 @@ export class Objext {
       let newData = this.valueOf()
       this.$dispatch(key, newData, oldData)
     }
-    this.$$__deps.push({ key, dependency, getter, callback })
+    this.$__deps.push({ key, dependency, getter, callback })
     target.$watch(dependency, callback, true)
     return true
   }
@@ -553,31 +587,35 @@ export class Objext {
    */
   $__compute(key, getter) {
     // 仅在已经初始化好的objext上执行计算
-    if (!this.$$__inited) {
+    if (!this.$__inited) {
       return;
     }
 
     // 不传getter，则用现有的getter重新计算
     if (getter === undefined) {
-      let item = this.$$__deps.find(item => item.key === key)
+      let item = this.$__deps.find(item => item.key === key)
       if (!item) {
         return
       }
       getter = item.getter
     }
 
-    this.$define('$$__dep', { key, getter })
-    let newValue = getter.call(this)
-    assign(this.$$__data, key, valueOf(newValue))
-    this.$define('$$__dep', {})
+    // 如果对外部有依赖
+    let refers = this.$__refers.filter(item => item.key === key)
+    let targets = refers.map(item => item.target)
+
+    this.$define('$__dep', { key, getter })
+    let newValue = getter.call(this, ...targets)
+    assign(this.$__data, key, valueOf(newValue))
+    this.$define('$__dep', {})
     return newValue
   }
 
   /**
    * 绑定两个objext实例，当目标实例的被依赖属性值发生变化时，重新计算当前实例的值。仅用于计算属性。
+   * @param {*} key 自己的计算属性
    * @param {*} target 目标实例
    * @param {*} targetPath 目标实例被依赖的属性路径
-   * @param {*} key 自己的属性
    * @example
    * const objx2 = new Objext({
    *   body: { head: 12 }
@@ -585,14 +623,27 @@ export class Objext {
    * const objx = new Objext({
    *   get weight() { return objx2.body.head * 17.8 }
    * })
-   * objx.$depend(objx2, 'body.head', 'weight')
+   * objx.$depend('weight', [
+   *   { target: objx2, path: 'body.head' },
+   * ])
    * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
-  $depend(target, targetPath, key) {
-    target.$watch(targetPath, ({ newValue, oldValue }) => {
-      if (!isEqual(newValue, oldValue)) {
-        this.$__compute(key) // 更新缓存
+  $depend(key, targets) {
+    targets.forEach((item) => {
+      let { target, path } = item
+      let callback = ({ newValue, oldValue }) => {
+        if (!isEqual(newValue, oldValue)) {
+          this.$__compute(key) // 更新缓存
+        }
       }
+      target.$watch(path, callback, true)
+      this.$__refers.push({
+        key,
+        target,
+        path,
+        callback,
+      })
+      this.$__compute(key) // 重新计算一次
     })
   }
 
@@ -605,7 +656,7 @@ export class Objext {
   $watch(path, fn, deep) {
     path = makeKeyPath(makeKeyChain(path))
 
-    this.$$__listeners.push({
+    this.$__listeners.push({
       path,
       fn,
       deep,
@@ -620,14 +671,14 @@ export class Objext {
    */
   $unwatch(path, fn) {
     let indexes = []
-    this.$$__listeners.forEach((item, i) => {
+    this.$__listeners.forEach((item, i) => {
       if (item.path === path && item.fn === fn) {
         indexes.push(i)
       }
     })
     // 从后往前删，不会出现问题
     indexes.reverse()
-    indexes.forEach(i => this.$$__listeners.splice(i, 1))
+    indexes.forEach(i => this.$__listeners.splice(i, 1))
     return this
   }
   /**
@@ -637,7 +688,7 @@ export class Objext {
    * @param {*} oldData this的老数据
    */
   $dispatch(path, newData, oldData) {
-    if (!this.$$__inited) {
+    if (!this.$__inited) {
       return this
     }
 
@@ -646,8 +697,8 @@ export class Objext {
     }
 
     // 收集批量修改过程中的的变动
-    if (this.$$__isBatchUpdate) {
-      this.$$__batch.push({ path, newData, oldData })
+    if (this.$__isBatchUpdate) {
+      this.$__batch.push({ path, newData, oldData })
       return this
     }
 
@@ -655,7 +706,7 @@ export class Objext {
       return this
     }
 
-    let listeners = this.$$__listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0))
+    let listeners = this.$__listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0))
     let propagation = true
     let pipeline = true
     let stopPropagation = () => propagation = false
@@ -704,7 +755,7 @@ export class Objext {
 
     // *的监听在所有监听器后面，最后执行这些监听器
     if (pipeline) {
-      let always = this.$$__listeners.filter(item => item.path === '*')
+      let always = this.$__listeners.filter(item => item.path === '*')
       for (let i = 0, len = always.length; i < len; i ++) {
         let item = always[i]
         let e = createE(item, newData, oldData)
@@ -720,10 +771,10 @@ export class Objext {
 
     // 向上冒泡
     if (propagation) {
-      let parent = this.$$__parent
-      let key = this.$$__key
+      let parent = this.$__parent
+      let key = this.$__key
       if (parent && parent.$dispatch) {
-        let parentNewData = parent.$$__data
+        let parentNewData = parent.$__data
         let parentOldData = assign(clone(parentNewData), key, oldData)
         let fullPath = key + '.' + path
         let finalPath = makeKeyPath(makeKeyChain(fullPath))
@@ -749,10 +800,10 @@ export class Objext {
     }
 
     let data = this.valueOf()
-    let snapshots = this.$$__snapshots
+    let snapshots = this.$__snapshots
     let i = snapshots.findIndex(item => item.tag === tag)
-    let listeners = [].concat(this.$$__listeners)
-    let deps = [].concat(this.$$__deps)
+    let listeners = [].concat(this.$__listeners)
+    let deps = [].concat(this.$__deps)
     let item = {
       tag,
       data,
@@ -767,10 +818,10 @@ export class Objext {
       snapshots.push(item)
     }
 
-    this.$define('$$__data', {})
+    this.$define('$__data', {})
     this.$put(clone(data))
-    this.$define('$$__listeners', [].concat(listeners))
-    this.$define('$$__deps', [].concat(deps))
+    this.$define('$__listeners', [].concat(listeners))
+    this.$define('$__deps', [].concat(deps))
 
     // 还原计算属性
     deps.forEach((item) => {
@@ -788,7 +839,7 @@ export class Objext {
       return this
     }
 
-    let snapshots = this.$$__snapshots
+    let snapshots = this.$__snapshots
     let item = null
 
     // 不传的时候，恢复到上一个快照
@@ -805,10 +856,10 @@ export class Objext {
 
     let { data, listeners, deps } = item
 
-    this.$define('$$__data', {})
+    this.$define('$__data', {})
     this.$put(clone(data))
-    this.$define('$$__listeners', [].concat(listeners))
-    this.$define('$$__deps', [].concat(deps))
+    this.$define('$__listeners', [].concat(listeners))
+    this.$define('$__deps', [].concat(deps))
 
     // 还原计算属性
     deps.forEach((item) => {
@@ -828,7 +879,7 @@ export class Objext {
       return this
     }
 
-    let snapshots = this.$$__snapshots
+    let snapshots = this.$__snapshots
 
     // 不传tag，删除上一个快照
     if (tag === undefined) {
@@ -849,27 +900,27 @@ export class Objext {
    * 锁定数据，无法做任何操作
    */
   $lock() {
-    this.$define('$$__locked', true)
+    this.$define('$__locked', true)
     return this
   }
   /**
    * 解锁
    */
   $unlock() {
-    this.$define('$$__locked', false)
+    this.$define('$__locked', false)
     return this
   }
   $isLocked() {
-    if (this.$$__locked) {
+    if (this.$__locked) {
       return true
     }
 
-    let parent = this.$$__parent
+    let parent = this.$__parent
     while (parent) {
-      if (parent.$$__locked) {
+      if (parent.$__locked) {
         return true
       }
-      parent = parent.$$__parent
+      parent = parent.$__parent
     }
 
     return false
@@ -891,7 +942,7 @@ export class Objext {
    */
   $formulate(validators) {
     validators = Array.isArray(validators) ? validators : [validators]
-    validators.forEach(item => this.$$__validators.push(item))
+    validators.forEach(item => this.$__validators.push(item))
     return this
   }
   /**
@@ -903,7 +954,7 @@ export class Objext {
   $validate(keyPath, next) {
     let isEmptyKeyPath = keyPath === undefined || keyPath === null
     let result = null
-    let validators = this.$$__validators.filter(item => isEmptyKeyPath || item.path === keyPath) // keyPath不传的时候，校验全部验证规则
+    let validators = this.$__validators.filter(item => isEmptyKeyPath || item.path === keyPath) // keyPath不传的时候，校验全部验证规则
     let deferers = []
     let argsLen = arguments.length
 
@@ -983,20 +1034,20 @@ export class Objext {
     return result
   }
   $strict(status) {
-    this.$define('$$__strict', !!status)
+    this.$define('$__strict', !!status)
     return this
   }
   $isStrict() {
-    if (this.$$__strict) {
+    if (this.$__strict) {
       return true
     }
 
-    let parent = this.$$__parent
+    let parent = this.$__parent
     while (parent) {
-      if (parent.$$__strict) {
+      if (parent.$__strict) {
         return true
       }
-      parent = parent.$$__strict
+      parent = parent.$__strict
     }
 
     return false
@@ -1009,16 +1060,16 @@ export class Objext {
     const Constructor = this.constructor // 解决当有些类继承Objext时的问题
 
     let value = this.valueOf()
-    let objx = new Constructor(this.$$__sources)
-    let deps = this.$$__deps
-    let listeners = this.$$__listeners
+    let objx = new Constructor(this.$__sources)
+    let deps = this.$__deps
+    let listeners = this.$__listeners
 
     objx.$put(value)
 
     // 还原事件监听，需要在还原计算属性之前执行
     if (complete) {
-      objx.$define('$$__deps', deps)
-      objx.$define('$$__listeners', listeners)
+      objx.$define('$__deps', deps)
+      objx.$define('$__listeners', listeners)
     }
 
     // 还原计算属性
@@ -1030,27 +1081,28 @@ export class Objext {
     return objx
   }
   $destory() {
-    this.$define('$$__snapshots', [])
-    this.$define('$$__validators', [])
-    this.$define('$$__listeners', [])
+    this.$define('$__snapshots', [])
+    this.$define('$__validators', [])
+    this.$define('$__listeners', [])
 
-    this.$define('$$__data', {})
+    this.$define('$__data', {})
 
-    this.$define('$$hash', '')
+    this.$define('$hash', '')
 
-    this.$define('$$__dep', {})
-    this.$define('$$__deps', [])
+    this.$define('$__dep', {})
+    this.$define('$__deps', [])
+    this.$define('$__refers', [])
 
-    this.$define('$$__parent', null)
-    this.$define('$$__key', '')
+    this.$define('$__parent', null)
+    this.$define('$__key', '')
 
-    this.$define('$$__slient', false)
-    this.$define('$$__locked', false)
-    this.$define('$$__inited', false)
-    this.$define('$$__isBatchUpdate', false)
-    this.$define('$$__batch', [])
+    this.$define('$__slient', false)
+    this.$define('$__locked', false)
+    this.$define('$__inited', false)
+    this.$define('$__isBatchUpdate', false)
+    this.$define('$__batch', [])
 
-    this.$define('$$__sources', null)
+    this.$define('$__sources', null)
     this.$put({})
   }
   valueOf() {

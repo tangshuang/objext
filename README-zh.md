@@ -292,7 +292,7 @@ objx.$batchEnd()
 - key: 要设置的属性名。注意，不支持keyPath方式，因为计算属性相对于当前对象。
 - getter: getter函数。
 
-### $depend(target, targetPath, seflPath)
+### $depend(key, targets)
 
 绑定其他objext实例。
 当一个objext实例的某个计算属性依赖另外一个objext实例的某个属性的时候用。
@@ -304,17 +304,39 @@ const objx1 = new Objext({
     return objx2.age / 2
   },
 })
-objx1.$depend(objx2, 'age', 'age')
+objx1.$depend('age', [
+  { target: objx2, path: 'age' },
+])
 ```
 
 上面的代码中，objx1的age属性依赖了objx2的age属性，但是由于计算属性的响应式效果仅对自己有效，它不能做到对外部依赖也有效果，因此，当objx2.age发生变化当时候，objx1并不能知道这个变化，它的age属性也就不会变，继续使用缓存，这就会造成错误。
 为了解决这个问题，我提供了$depend方法，它可以绑定两个objext实例的相关属性，保证可以做到正常响应。
 
-- target: 要绑定的目标实例
-- targetPath: 目标实例上要绑定的属性路径
-- selftPath: 自己的那个计算属性是要被绑定的
+- key: 自己的那个计算属性是要被绑定的
+- targets: 数组，每个元素包括
+  - target: 要绑定的目标实例
+  - path: 目标实例上要绑定的属性路径
 
 当然，其实解决这个问题，还有一种办法，就是将多个objext实例放到一个大的objext实例中去，而不是分开管理。当然，这也是一种建议而已。
+
+使用$depend可以显著提升计算属性的能力，它扩展原生计算属性的功能，可以给计算属性的计算器传入参数，而传入的参数就是$depend给的target。例如：
+
+```js
+const objx1 = new Objext({
+  get age(objx2, objx3) {
+    let age2 = objx2 ? objx2.age : 0
+    let age3 = objx3 ? objx3.age : 0
+    return (age2 + age3) / 2
+  }
+})
+objx1.$depend('age', [
+  { target: objx2, path: 'age' },
+  { target: objx3, path: 'age' },
+])
+```
+
+上面这段代码让你的计算属性支持两个参数，而这两个参数就是$depend的targets里面的target，而且是按顺序传入。
+在这样用的时候要注意，当objext实例化的时候，计算属性会被运行，这也就意味着这个时候objx2和objx3还没有被载入，因此，一定要在计算属性的计算器中做好逻辑判断，否则程序就会报错。
 
 ### $clone()
 
@@ -324,7 +346,7 @@ objx1.$depend(objx2, 'age', 'age')
 
 销毁当前实例，释放内存。
 
-### $$hash
+### $hash
 
 这是一个属性，可以获取当前对象的hash值，在判断两个Objext对象的实际内容是否相等时，可以利用它来进行判断。
 

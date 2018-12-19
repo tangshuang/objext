@@ -251,6 +251,14 @@ export function unionArray(a, b) {
 }
 
 /**
+ * 使数组唯一化
+ * @param {*} items
+ */
+export function uniqueArray(items) {
+  return items.filter((item, i) => items.indexOf(item) === i)
+}
+
+/**
  * 以某个对象作为原型创建一个对象
  * @param {*} obj
  */
