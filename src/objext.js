@@ -908,7 +908,8 @@ export class Objext {
     let argsLen = arguments.length
 
     const createError = ({ path, value, message, warn }) => {
-      let error = new Error(message)
+      let msg = isFunction(message) ? message.call(this, { path, value }) : message // message支持函数
+      let error = new Error(msg)
       defineProperties(error, {
         value,
         path,
