@@ -952,7 +952,18 @@ export class Objext {
       if (isInstanceOf(child, Objext)) {
         let res = child.$validate() // 向下传递的时候，就全量校验
         if (isInstanceOf(res, Error)) {
-          result = res
+          return res
+        }
+      }
+      else if (isArray(child)) {
+        for (let i = 0, len = child.length; i < len; i ++) {
+          let item = child[i]
+          if (isInstanceOf(item, Objext)) {
+            let res = item.$validate() // 向下传递的时候，就全量校验
+            if (isInstanceOf(res, Error)) {
+              return res
+            }
+          }
         }
       }
     }
