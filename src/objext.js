@@ -526,7 +526,7 @@ export class Objext {
       return false
     }
 
-    let callback = ({ path, oldValue, newValue }) => {
+    let callback = () => {
       let oldData = this.valueOf()
       this.$__compute(key, getter)
       let newData = this.valueOf()
