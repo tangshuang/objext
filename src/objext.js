@@ -37,6 +37,8 @@ export class Objext {
 
     this.$define('$$__slient', false)
     this.$define('$$__locked', false)
+    this.$define('$$__strict', false)
+
     this.$define('$$__inited', false) // 用来记录是否已经塞过数据了
     this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$$__batch', []) // 用来记录批量一次更新的内容
@@ -106,7 +108,10 @@ export class Objext {
           }
 
           // 校验数据
-          target.$validate(key, v)
+          if (target.$isStrict()) {
+            target.$validate(key, v)
+            return
+          }
 
           let oldData = valueOf(target)
 
@@ -198,6 +203,9 @@ export class Objext {
         $isSlient: {
           value: prototypes.$isSlient.bind(xarr),
         },
+        $isStrict: {
+          value: prototypes.$isStrict.bind(xarr),
+        },
         $$__inited: {
           value: true,
         },
@@ -249,8 +257,11 @@ export class Objext {
     }
 
     // 数据校验
-    // 校验过程不中断下方的赋值，如果想要中断，可以在warn里面使用throw new Error
-    this.$validate(path, value)
+    // 校验过程如果想要跑出错误，可以在warn里面使用throw new Error
+    if (this.$isStrict()) {
+      this.$validate(path, value)
+      return
+    }
 
     let oldData = this.valueOf()
 
@@ -969,6 +980,25 @@ export class Objext {
     }
 
     return result
+  }
+  $strict(status) {
+    this.$define('$$__strict', !!status)
+    return this
+  }
+  $isStrict() {
+    if (this.$$__strict) {
+      return true
+    }
+
+    let parent = this.$$__parent
+    while (parent) {
+      if (parent.$$__strict) {
+        return true
+      }
+      parent = parent.$$__strict
+    }
+
+    return false
   }
 
   /**

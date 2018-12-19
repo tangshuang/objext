@@ -27,6 +27,7 @@ describe('对数据进行校验', () => {
   test('修改数据的时候进行校验', () => {
     let objx = new Objext(origin)
     objx.$formulate(validators)
+    objx.$strict(true)
     let fn = () => objx.$set('name', null)
     expect(fn).toThrowError('name必须为字符串')
   })
