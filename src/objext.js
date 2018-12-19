@@ -20,7 +20,7 @@ import {
 } from './utils'
 
 export class Objext {
-  constructor(data) {
+  constructor(sources) {
     this.$define('$$__snapshots', [])
     this.$define('$$__validators', [])
     this.$define('$$__listeners', [])
@@ -41,13 +41,14 @@ export class Objext {
     this.$define('$$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$$__batch', []) // 用来记录批量一次更新的内容
 
-    this.$init(data)
+    this.$define('$$__sources', sources)
+    this.$init(sources)
   }
 
-  $init(data) {
+  $init(sources) {
     // 写入数据
-    if (data) {
-      this.$put(data)
+    if (sources) {
+      this.$put(sources)
     }
 
     // 每当值发生变化时，hash被更新
@@ -136,10 +137,10 @@ export class Objext {
       })
     }
 
-
     function xcreate(value, key, target) {
       if (isInstanceOf(value, Objext)) {
-        let objx = value.$clone()
+        // 这里需要注意：当把一个objext实例作为子属性值加入另外一个objext的时候，会被修改$$__key和$$__parent，这要求该objext实例是独占的，如果被多处使用，会存在引用错误问题，解决的一种办法是使用$clone(true)创建一个完全备份
+        let objx = value
         objx.$define('$$__key', key)
         objx.$define('$$__parent', target)
         objx.$enhance('$$__data', () => target.$$__data[key])
@@ -962,20 +963,26 @@ export class Objext {
   /**
    * 基于当前对象，克隆出一个新对象
    */
-  $clone() {
+  $clone(complete = false) {
+    const Constructor = this.constructor // 解决当有些类继承Objext时的问题
+
     let value = this.valueOf()
-    let objx = new Objext()
-    let listeners = this.$$__listeners
+    let objx = new Constructor(this.$$__sources)
     let deps = this.$$__deps
+    let listeners = this.$$__listeners
 
     objx.$put(value)
-    objx.$define('$$__listeners', [].concat(listeners))
-    objx.$define('$$__deps', [].concat(deps))
+
+    // 还原事件监听，需要在还原计算属性之前执行
+    if (complete) {
+      objx.$define('$$__deps', deps)
+      objx.$define('$$__listeners', listeners)
+    }
 
     // 还原计算属性
     deps.forEach((item) => {
       let { key, getter } = item
-      this.$describe(key, getter)
+      objx.$describe(key, getter)
     })
 
     return objx
@@ -1001,6 +1008,7 @@ export class Objext {
     this.$define('$$__isBatchUpdate', false)
     this.$define('$$__batch', [])
 
+    this.$define('$$__sources', null)
     this.$put({})
   }
   valueOf() {

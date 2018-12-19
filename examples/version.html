@@ -23,39 +23,33 @@ const origin = {
     return this.name + ': ' + this.age
   },
 }
-var objx = new Objext(origin)
-var get = () => objx
+window.objx = new Objext(origin)
 
 function render() {
-  let objx = get()
-  let info = objx.info
-  let age = objx.age
+  let info = window.objx.info
+  let age = window.objx.age
   document.querySelector('#text').innerHTML = info
   document.querySelector('#input').value = age
 }
 
 document.querySelector('#input').addEventListener('input', (e) => {
-  let objx = get()
   let value = e.target.value
-  objx.age = value
+  window.objx.age = value
   render()
 })
 
 document.querySelector('#commit').addEventListener('click', () => {
-  let objx = get()
-  objx.$commit('version')
+  window.objx.$commit('version')
   render()
 })
 
 document.querySelector('#reset').addEventListener('click', () => {
-  let objx = get()
-  objx.$reset('version')
+  window.objx.$reset('version')
   render()
 })
 
 document.querySelector('#clone').addEventListener('click', () => {
-  let objx = get()
-  objx = objx.$clone()
+  window.objx = window.objx.$clone()
   render()
 })
 
