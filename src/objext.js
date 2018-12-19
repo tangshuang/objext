@@ -113,7 +113,7 @@ export class Objext {
           value = xcreate(v, key, target)
 
           // 直接更新数据
-          assign(target.$$__data, key, clone(v))
+          assign(target.$$__data, key, valueOf(v))
 
           // 触发watch
           // 会冒泡上去
@@ -401,7 +401,7 @@ export class Objext {
 
         // 把初始化结果先放在$$__data上，这样后面到依赖搜集过程才不会报错
         // 但它不是最终值（缓存），而只是一个初始值，最终值要等待依赖收集执行完毕
-        assign(this.$$__data, key, clone(data[key]))
+        assign(this.$$__data, key, valueOf(data[key]))
       }
       // 普通属性
       else {
@@ -557,7 +557,7 @@ export class Objext {
 
     this.$define('$$__dep', { key, getter })
     let newValue = getter.call(this)
-    assign(this.$$__data, key, clone(newValue))
+    assign(this.$$__data, key, valueOf(newValue))
     this.$define('$$__dep', {})
     return newValue
   }
