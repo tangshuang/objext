@@ -916,7 +916,7 @@ export class Objext {
       }
       let { validate, message, warn, path, determine, deferred } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
       let key = path === '*' || isEmpty(path) ? '' : path
-      let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this.$$__data, key)
+      let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this, key)
 
       // 某些情况下不检查该字段
       if (isFunction(determine) && !determine.call(this, value)) {
@@ -948,7 +948,7 @@ export class Objext {
     // 仅传了keyPath不传next的情况下才向下传递
     if (argsLen === 1 && !isEmptyKeyPath) {
       let key = keyPath === '*' ? '' : keyPath
-      let child = parse(this.$$__data, key)
+      let child = parse(this, key)
       if (isInstanceOf(child, Objext)) {
         let res = child.$validate() // 向下传递的时候，就全量校验
         if (isInstanceOf(res, Error)) {
