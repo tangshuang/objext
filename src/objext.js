@@ -686,7 +686,7 @@ export class Objext {
       key,
       target,
       alias,
-      path,
+      watch,
       callback,
     })
 
@@ -705,7 +705,7 @@ export class Objext {
     // 将原有的依赖清除先
     refers.forEach((item, i) => {
       if (item.key === key && (target === undefined || item.target === target || (typeof target === 'string' && item.alias === target))) {
-        item.target.$unwatch(item.path, item.callback)
+        item.target.$unwatch(item.watch, item.callback)
         refers.splice(i, 1)
       }
     })
