@@ -70,6 +70,7 @@ export class Objext {
    */
   $define(key, value) {
     defineProperty(this, key, value)
+    return this
   }
   /**
    * 设置一个不可枚举的计算属性
@@ -78,6 +79,7 @@ export class Objext {
    */
   $enhance(key, get) {
     Object.defineProperty(this, key, { get, configurable: true })
+    return this
   }
 
   /**
@@ -150,14 +152,20 @@ export class Objext {
         let objx = value
         objx.$define('$__key', key)
         objx.$define('$__parent', target)
+
+        target.$__data[key] = target.$__data[key] || {}
         objx.$enhance('$__data', () => target.$__data[key])
+
         return objx
       }
       else if (isObject(value)) {
         let objx = new Objext()
         objx.$define('$__key', key)
         objx.$define('$__parent', target)
+
+        target.$__data[key] = target.$__data[key] || {}
         objx.$enhance('$__data', () => target.$__data[key])
+
         objx.$put(value)
         return objx
       }
