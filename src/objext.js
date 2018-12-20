@@ -8,6 +8,7 @@ import {
   isInstanceOf,
   isEmpty,
   uniqueArray,
+  each,
   setProto,
   makeKeyPath,
   makeKeyChain,
@@ -920,9 +921,8 @@ export class Objext {
     this.$define('$__computers', Object.assign({}, computers))
 
     // 还原计算属性
-    deps.forEach((item) => {
-      let { key, getter } = item
-      this.$describe(key, getter)
+    each(computers, (value, key) => {
+      this.$describe(key, value)
     })
 
     return this
@@ -959,9 +959,8 @@ export class Objext {
     this.$define('$__computers', Object.assign({}, computers))
 
     // 还原计算属性
-    deps.forEach((item) => {
-      let { key, getter } = item
-      this.$describe(key, getter)
+    each(computers, (value, key) => {
+      this.$describe(key, value)
     })
 
     return this
@@ -1158,21 +1157,23 @@ export class Objext {
 
     let value = this.valueOf()
     let objx = new Constructor(this.$__sources)
+
     let deps = this.$__deps
     let listeners = this.$__listeners
+    let computers = this.$__computers
 
     objx.$put(value)
 
     // 还原事件监听，需要在还原计算属性之前执行
     if (complete) {
-      objx.$define('$__deps', deps)
-      objx.$define('$__listeners', listeners)
+      objx.$define('$__deps', [].concat(deps))
+      objx.$define('$__listeners', [].concat(listeners))
+      objx.$define('$__computers', Object.assign({}, computers))
     }
 
     // 还原计算属性
-    deps.forEach((item) => {
-      let { key, getter } = item
-      objx.$describe(key, getter)
+    each(computers, (value, key) => {
+      objx.$describe(key, value)
     })
 
     return objx
