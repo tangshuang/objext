@@ -614,49 +614,106 @@ export class Objext {
 
     // 如果对外部有依赖
     let refers = this.$__refers.filter(item => item.key === key)
-    let targets = refers.map(item => item.target)
+    let targets = {}
+
+    refers.forEach((item) => {
+      targets[item.alias] = item.target
+    })
 
     this.$define('$__dep', { key, getter })
-    let newValue = getter.call(this, ...targets)
+    let newValue = getter.call(this, targets)
     assign(this.$__data, key, valueOf(newValue))
     this.$define('$__dep', {})
     return newValue
   }
 
   /**
-   * 绑定两个objext实例，当目标实例的被依赖属性值发生变化时，重新计算当前实例的值。仅用于计算属性。
+   * 绑定两个objext实例，当目标实例的被依赖属性值发生变化时，重新计算当前实例的值。
+   * 仅用于计算属性。
    * @param {*} key 自己的计算属性
-   * @param {*} target 目标实例
-   * @param {*} targetPath 目标实例被依赖的属性路径
+   * @param {object} options
+   *  - alias 目标在计算属性中的别名
+   *  - target 目标实例
+   *  - watch 目标实例被依赖的属性路径
    * @example
    * const objx2 = new Objext({
    *   body: { head: 12 }
    * })
    * const objx = new Objext({
-   *   get weight() { return objx2.body.head * 17.8 }
+   *   get weight({ objx2 }) { return objx2.body.head * 17.8 }
    * })
-   * objx.$depend('weight', [
-   *   { target: objx2, path: 'body.head' },
-   * ])
+   * objx.$bind('weight', { objx2, watch: 'body.head' })
    * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
-  $depend(key, targets) {
-    targets.forEach((item) => {
-      let { target, path } = item
-      let callback = ({ newValue, oldValue }) => {
-        if (!isEqual(newValue, oldValue)) {
-          this.$__compute(key) // 更新缓存
-        }
+  $bind(key, options) {
+    const refers = this.$__refers
+    const recompute = () => {
+      let oldData = this.valueOf()
+      this.$__compute(key)
+      let newData = this.valueOf()
+      this.$dispatch(key, newData, oldData)
+    }
+    const callback = ({ newValue, oldValue }) => {
+      if (!isEqual(newValue, oldValue)) {
+        recompute()
       }
-      target.$watch(path, callback, true)
-      this.$__refers.push({
-        key,
-        target,
-        path,
-        callback,
-      })
-      this.$__compute(key) // 重新计算一次
+    }
+
+    let { target, watch, alias } = options
+
+    // 解析特别方式传入
+    let attrs = Object.keys(options)
+    attrs.forEach((attr) => {
+      if (!inArray(attr, ['target', 'watch', 'alias'])) {
+        target = options[attr]
+        alias = attr
+      }
     })
+
+    // 先让target watch，这样，当target变化时，当前实例也变化
+    target.$watch(watch, callback, true)
+    // 加入到refers中记录下来后面可以取消
+    let index = refers.findIndex(item => item.key == key && item.alias === alias)
+
+    // 如果已经存在这个alias了，那么要先解绑
+    if (index > -1) {
+      let item = refers[index]
+      this.$unbind(key, item.target)
+    }
+    // 解绑之后，就被删掉了
+
+    refers.push({
+      key,
+      target,
+      alias,
+      path,
+      callback,
+    })
+
+    // 重新计算一次
+    this.$__compute(key)
+
+    return this
+  }
+  /**
+   * 解除绑定
+   * @param {*} key
+   * @param {*} target
+   */
+  $unbind(key, target) {
+    const refers = this.$__refers
+    // 将原有的依赖清除先
+    refers.forEach((item, i) => {
+      if (item.key === key && (target === undefined || item.target === target || (typeof target === 'string' && item.alias === target))) {
+        item.target.$unwatch(item.path, item.callback)
+        refers.splice(i, 1)
+      }
+    })
+
+    // 重新计算一次
+    this.$__compute(key)
+
+    return this
   }
 
   /**
