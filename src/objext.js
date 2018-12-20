@@ -25,9 +25,7 @@ export class Objext {
   constructor(sources) {
     this.$define('$__snapshots', [])
     this.$define('$__validators', [])
-    this.$define('$__listeners', [])
 
-    this.$define('$__data', {})
 
     this.$define('$hash', '')
 
@@ -35,6 +33,7 @@ export class Objext {
     this.$define('$__deps', [])
     this.$define('$__refers', [])
     this.$define('$__computers', {}) // 用于收集所有计算器
+    this.$define('$__listeners', [])
 
     this.$define('$__parent', null)
     this.$define('$__key', '')
@@ -42,11 +41,11 @@ export class Objext {
     this.$define('$__slient', false)
     this.$define('$__locked', false)
     this.$define('$__strict', false)
-
     this.$define('$__inited', false) // 用来记录是否已经塞过数据了
     this.$define('$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$__batch', []) // 用来记录批量一次更新的内容
 
+    this.$define('$__data', {})
     this.$define('$__sources', sources)
     this.$init(sources)
   }
@@ -897,6 +896,7 @@ export class Objext {
     let listeners = [].concat(this.$__listeners)
     let deps = [].concat(this.$__deps)
     let computers = Object.assign({}, this.$__computers)
+    let refers = [].concat(this.$__refers)
 
     let item = {
       tag,
@@ -904,6 +904,7 @@ export class Objext {
       listeners,
       deps,
       computers,
+      refers,
     }
 
     if (i > -1) {
@@ -919,6 +920,7 @@ export class Objext {
     this.$define('$__listeners', [].concat(listeners))
     this.$define('$__deps', [].concat(deps))
     this.$define('$__computers', Object.assign({}, computers))
+    this.$define('$__refers', [].concat(refers))
 
     // 还原计算属性
     each(computers, (value, key) => {
@@ -950,13 +952,14 @@ export class Objext {
       return this
     }
 
-    let { data, listeners, deps, computers } = item
+    let { data, listeners, deps, computers, refers } = item
 
     this.$define('$__data', {})
     this.$put(clone(data))
     this.$define('$__listeners', [].concat(listeners))
     this.$define('$__deps', [].concat(deps))
     this.$define('$__computers', Object.assign({}, computers))
+    this.$define('$__refers', [].concat(refers))
 
     // 还原计算属性
     each(computers, (value, key) => {
@@ -1161,6 +1164,7 @@ export class Objext {
     let deps = this.$__deps
     let listeners = this.$__listeners
     let computers = this.$__computers
+    let refers = this.$__refers
 
     objx.$put(value)
 
@@ -1169,6 +1173,7 @@ export class Objext {
       objx.$define('$__deps', [].concat(deps))
       objx.$define('$__listeners', [].concat(listeners))
       objx.$define('$__computers', Object.assign({}, computers))
+      objx.$define('$__refres', [].concat(refers))
     }
 
     // 还原计算属性
