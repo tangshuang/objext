@@ -152,9 +152,7 @@ export class Objext {
         let objx = value
         objx.$define('$__key', key)
         objx.$define('$__parent', target)
-
-        target.$__data[key] = target.$__data[key] || {}
-        objx.$enhance('$__data', () => target.$__data[key])
+        target.$__data[key] = objx.$__data // 数据引用
 
         return objx
       }
@@ -162,9 +160,7 @@ export class Objext {
         let objx = new Objext()
         objx.$define('$__key', key)
         objx.$define('$__parent', target)
-
-        target.$__data[key] = target.$__data[key] || {}
-        objx.$enhance('$__data', () => target.$__data[key])
+        target.$__data[key] = objx.$__data // 数据引用
 
         objx.$put(value)
         return objx
@@ -418,6 +414,7 @@ export class Objext {
 
     let keys = Object.keys(data)
     let getters = []
+    let values = []
     let depKeys = this.$__deps.map(item => item.key)
     depKeys = uniqueArray(depKeys)
 
@@ -451,20 +448,27 @@ export class Objext {
           key,
           getter: descriptor.get,
         })
-
-        // 把初始化结果先放在$__data上，这样后面到依赖搜集过程才不会报错
-        // 但它不是最终值（缓存），而只是一个初始值，最终值要等待依赖收集执行完毕
-        assign(this.$__data, key, valueOf(data[key]))
       }
       // 普通属性
       else {
-        this.$set(key, data[key])
+        values.push({
+          key,
+          value: data[key]
+        })
       }
+
+      // 把初始化结果先放在$__data上，这样后面到依赖搜集过程才不会报错
+      // 但它不是最终值（缓存），而只是一个初始值，最终值要等待依赖收集执行完毕
+      assign(this.$__data, key, valueOf(data[key]))
     })
 
     // 第一次实例化objext时，$describe只是为当前实例设置了这些计算属性，要等到下面到才会真正创建值（缓存）
     getters.forEach((item) => {
       this.$describe(item.key, item.getter)
+    })
+    // 之所以要放在后面，是因为在set的时候，也可能依赖到$__data上到值
+    values.forEach((item) => {
+      this.$set(item.key, item.value)
     })
 
     this.$batchEnd()
