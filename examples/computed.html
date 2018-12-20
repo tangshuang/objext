@@ -17,7 +17,9 @@ const objx = new Objext(origin)
 console.log(objx.info)
 
 // 监听
-objx.$watch('info', () => {})
+objx.$watch('info', () => {
+  console.log('info changed')
+})
 
 // 改变依赖
 objx.age = 11

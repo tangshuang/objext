@@ -292,7 +292,7 @@ objx.$batchEnd()
 - key: 要设置的属性名。注意，不支持keyPath方式，因为计算属性相对于当前对象。
 - getter: getter函数。
 
-### $bind(key, { target, alias, watch })
+### $bind(key, { target, name, dependency })
 
 绑定其他objext实例。
 当一个objext实例的某个计算属性依赖另外一个objext实例的某个属性的时候用。
@@ -310,16 +310,16 @@ const objx1 = new Objext({
 为了解决这个问题，我提供了$bind方法，它可以绑定两个objext实例的相关属性，保证可以做到正常响应。
 
 ```js
-objx1.$bind('age', { target: objx2, alias: 'objx2', watch: 'weight' })
+objx1.$bind('age', { target: objx2, name: 'objx2', dependency: 'weight' })
 // 或者：
-objx1.$bind('age', { objx2, watch: 'weight' })
+objx1.$bind('age', { objx2, dependency: 'weight' })
 ```
 
 - key: 自己的哪个计算属性是要被绑定的，注意，不支持keyPath形式，因为计算属性都是当前实例的顶级属性
   - ?target: 要绑定的目标实例
-  - ?alias: 作为计算属性的什么名字使用
-  - ?x: target和alias可以合并，直接像上面这种传参方式，内部自动识别
-  - watch: 目标实例上要绑定的属性路径
+  - ?name: 作为计算属性的什么名字使用
+  - ?x: target和name可以合并，直接像上面这种传参方式，内部自动识别
+  - dependency: 目标实例上要绑定的属性路径
 
 使用$bind可以显著提升计算属性的能力，它扩展原生计算属性的功能，可以给计算属性的计算器传入参数，而传入的参数就是$bind给的target。例如：
 
@@ -331,15 +331,15 @@ const objx1 = new Objext({
     return (age2 + age3) / 2
   }
 })
-objx1.$bind('age', { objx2, watch: 'age' })
-objx1.$bind('age', { objx3, watch: 'age' })
+objx1.$bind('age', { objx2, dependency: 'age' })
+objx1.$bind('age', { objx3, dependency: 'age' })
 ```
 
 上面这段代码让你的计算属性支持两个参数，而这两个参数就是$bind里面的target，而且是按顺序传入。
 在这样用的时候要注意：
 
 - 当objext实例化的时候，计算属性会被运行，这也就意味着这个时候objx2和objx3还没有被载入，因此，一定要在计算属性的计算器中做好逻辑判断，否则程序就会报错。
-- alias是唯一的，如果你传入的alias已经存在，原来的会先被解绑，然后再绑定新的
+- name是唯一的，如果你传入的name已经存在，原来的会先被解绑，然后再绑定新的
 - 所有计算属性的参数是相同的（顺序也必须相同），你不能在两个计算属性计算器中使用不同的参数。
 - 绑定之后，计算属性会重新计算一次，但不会触发watchers
 
