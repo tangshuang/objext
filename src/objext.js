@@ -1129,7 +1129,7 @@ export class Objext {
 
     // 向下传递
     // 仅传了keyPath不传next的情况下才向下传递
-    function validateChild(keyPath) {
+    const validateChild = (keyPath) => {
       let key = keyPath === '*' ? '' : keyPath
       let child = parse(this, key)
       if (isInstanceOf(child, Objext)) {
