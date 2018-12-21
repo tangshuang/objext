@@ -1129,7 +1129,7 @@ export class Objext {
 
     // 向下传递
     // 仅传了keyPath不传next的情况下才向下传递
-    if (argsLen === 1 && !isEmptyKeyPath) {
+    function validateChild(keyPath) {
       let key = keyPath === '*' ? '' : keyPath
       let child = parse(this, key)
       if (isInstanceOf(child, Objext)) {
@@ -1148,6 +1148,22 @@ export class Objext {
             }
           }
         }
+      }
+    }
+    if (argsLen === 0) {
+      let keys = Object.keys(this.$__data)
+      for (let i = 0, len = keys.length; i < len; i ++) {
+        let key = keys[i]
+        let res = validateChild(key)
+        if (isInstanceOf(res, Error)) {
+          return res
+        }
+      }
+    }
+    else if (argsLen === 1 && !isEmptyKeyPath) {
+      let res = validateChild(keyPath)
+      if (isInstanceOf(res, Error)) {
+        return res
       }
     }
 
