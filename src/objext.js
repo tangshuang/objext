@@ -136,9 +136,8 @@ export class Objext {
            * 由于依赖收集中$__dep仅在顶层的this中才会被给key和getter，因此，只能收集到顶层属性
            * 但是，由于在进行监听时，deep为true，因此，即使是只有顶层属性被监听，当顶层属性的深级属性变动时，这个监听也会被触发，因此也能带来依赖响应
            */
-          if (target.$__dep && target.$__dep.key) {
+          if (!isEmpty(target.$__dep)) {
             target.$__dep.dependency = key
-            target.$__dep.target = target
             target.$__collect()
           }
 
@@ -341,8 +340,8 @@ export class Objext {
     // 把计算属性对外部的引用也删除
     this.$__refers.forEach((item, i) => {
       if (item.key === path) {
-        item.target.$unwatch(item.path, item.callback)
-        this.$__refers.splice(i, 1)
+        item.target.$unwatch(item.dependency, item.callback)
+        refers.splice(i, 1)
       }
     })
 
@@ -394,7 +393,7 @@ export class Objext {
     this.$__deps.length = 0
     // 把计算属性对外部的引用也删除
     this.$__refers.forEach((item) => {
-      item.target.$unwatch(item.path, item.callback)
+      item.target.$unwatch(item.dependency, item.callback)
     })
     this.$__refers.length = 0
     // 清除计算器
@@ -431,15 +430,15 @@ export class Objext {
           this.$unwatch(item.dependency, item.callback)
           this.$__deps.splice(i, 1)
         }
-        // 注意，这里没有删除其他对这个path属性有依赖的watchers，因为我们可以用$set添加这个属性，添加可以引起其他依赖这个属性的属性的变化
+        // 注意，这里没有删除其他对这个key属性有依赖的watchers，因为我们可以用$set添加这个属性，添加可以引起其他依赖这个属性的属性的变化
       })
       // 把计算器删掉
       delete this.$__computers[key]
       // 把计算属性对外部的引用也删除
       this.$__refers.forEach((item, i) => {
         if (item.key === key) {
-          item.target.$unwatch(item.path, item.callback)
-          this.$__refers.splice(i, 1)
+          item.target.$unwatch(item.dependency, item.callback)
+          refers.splice(i, 1)
         }
       })
 
@@ -587,16 +586,9 @@ export class Objext {
       return this
     }
 
-    // 如果对外部有依赖
-    let refers = this.$__refers.filter(item => item.key === key)
-    let targets = {}
-    refers.forEach((item) => {
-      targets[item.name] = item.target
-    })
-
     // getter执行过程中会有依赖收集
     this.$define('$__dep', { key })
-    let newValue = getter.call(this, targets)
+    let newValue = getter.call(this)
     assign(this.$__data, key, valueOf(newValue))
     this.$define('$__dep', {})
 
@@ -611,13 +603,13 @@ export class Objext {
       return this
     }
 
-    let { key, dependency, target } = this.$__dep
-    if (!key || !dependency || !target) {
+    let { key, dependency } = this.$__dep
+    if (!key || !dependency) {
       return this
     }
 
     // 已经收集过了，就不再进行收集
-    if (this.$__deps.find(item => item.key === key && item.dependency === dependency)) {
+    if (this.$__deps.some(item => item.key === key && item.dependency === dependency)) {
       return this
     }
 
@@ -629,7 +621,7 @@ export class Objext {
       this.$dispatch(key, newData, oldData)
     }
     this.$__deps.push({ key, dependency, callback })
-    target.$watch(dependency, callback, true)
+    this.$watch(dependency, callback, true)
 
     return this
   }
@@ -639,7 +631,6 @@ export class Objext {
    * 仅用于计算属性。
    * @param {*} key 自己的计算属性
    * @param {object} refer
-   *  - name 目标在计算属性中的别名
    *  - target 目标实例
    *  - dependency 目标实例被依赖的属性路径
    * @example
@@ -652,56 +643,74 @@ export class Objext {
    * objx.$bind('weight', { objx2, dependency: 'body.head' })
    * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
-  $bind(key, refer) {
+  $bind(key, target) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
     }
 
+    const getter = this.$__computers[key]
     const refers = this.$__refers
-    const recompute = () => {
-      let oldData = this.valueOf()
-      this.$__compute(key)
-      let newData = this.valueOf()
-      this.$dispatch(key, newData, oldData)
-    }
     const callback = ({ newValue, oldValue }) => {
       if (!isEqual(newValue, oldValue)) {
-        recompute()
+        let oldData = this.valueOf()
+        this.$__compute(key)
+        let newData = this.valueOf()
+        this.$dispatch(key, newData, oldData)
       }
     }
-
-    let { target, dependency, name } = refer
-
-    // 解析特别方式传入
-    let attrs = Object.keys(refer)
-    attrs.forEach((attr) => {
-      if (!inArray(attr, ['target', 'dependency', 'name'])) {
-        target = refer[attr]
-        name = attr
-      }
-    })
 
     // 加入到refers中记录下来后面可以取消
-    let index = refers.findIndex(item => item.key == key && item.name === name)
+    let index = refers.findIndex(item => item.key == key && item.target === target)
     // 如果已经存在这个name了，那么要先解绑
     if (index > -1) {
-      let item = refers[index]
-      this.$unbind(key, item.target)
+      this.$unbind(key, target)
     }
 
-    // 先让target watch，这样，当target变化时，当前实例也变化
-    target.$watch(dependency, callback, true)
-    refers.push({
+    // 加入依赖列表
+    let refer = {
       key,
-      name,
       target,
-      dependency,
       callback,
-    })
+      dependency: ''
+    }
+    refers.push(refer)
 
-    // 重新计算一次
-    recompute()
+    // 重写target的依赖收集器
+    target.$__collect = () => {
+      // 仅在已经初始化好的objext上执行计算
+      if (!target.$__inited) {
+        return target
+      }
+
+      let { dependency, callback } = target.$__dep
+      if (!dependency || !callback) {
+        return target
+      }
+
+      // 已经收集过了，就不再进行收集
+      if (refers.some(item => item.callback === callback && item.dependency === dependency && item.target === target)) {
+        return target
+      }
+
+      // 多重依赖收集
+      refer.dependency = dependency
+      target.$watch(dependency, callback, true)
+
+      return target
+    }
+
+    // getter执行过程中会有依赖收集
+    let oldData = this.valueOf()
+    target.$define('$__dep', { callback })
+    let newValue = getter.call(this)
+    assign(this.$__data, key, valueOf(newValue))
+    target.$define('$__dep', {})
+    let newData = this.valueOf()
+    this.$dispatch(key, newData, oldData)
+
+    // 删除方法重写，恢复默认动作
+    delete target.$__collect
 
     return this
   }
@@ -719,20 +728,17 @@ export class Objext {
     const refers = this.$__refers
     // 将原有的依赖清除先
     refers.forEach((item, i) => {
-      if (item.key === key && (target === undefined || item.target === target || (typeof target === 'string' && item.name === target))) {
+      if (item.key === key && (target === undefined || item.target === target)) {
         item.target.$unwatch(item.dependency, item.callback)
         refers.splice(i, 1)
       }
     })
 
     // 重新计算一次
-    const recompute = () => {
-      let oldData = this.valueOf()
-      this.$__compute(key)
-      let newData = this.valueOf()
-      this.$dispatch(key, newData, oldData)
-    }
-    recompute()
+    let oldData = this.valueOf()
+    this.$__compute(key)
+    let newData = this.valueOf()
+    this.$dispatch(key, newData, oldData)
 
     return this
   }
@@ -1184,6 +1190,10 @@ export class Objext {
     return objx
   }
   $destory() {
+    this.$__refers.forEach((item) => {
+      item.target.$unwatch(item.dependency, item.callback)
+    })
+
     this.$define('$__snapshots', null)
     this.$define('$__validators', null)
     this.$define('$__listeners', null)

@@ -292,9 +292,9 @@ objx.$batchEnd()
 - key: 要设置的属性名。注意，不支持keyPath方式，因为计算属性相对于当前对象。
 - getter: getter函数。
 
-### $bind(key, { target, name, dependency })
+### $bind(key, target)
 
-绑定其他objext实例。
+绑定一个计算属性和其他objext实例。
 当一个objext实例的某个计算属性依赖另外一个objext实例的某个属性的时候用。
 
 ```js
@@ -306,51 +306,27 @@ const objx1 = new Objext({
 })
 ```
 
-上面的代码中，objx1的age属性依赖了objx2的weight属性，但是由于计算属性的响应式效果仅对自己有效，它不能做到对外部依赖也有效果，因此，当objx2.weight发生变化当时候，objx1并不能知道这个变化，它的age属性也就不会变，继续使用缓存，这就会造成错误。
+上面的代码中，objx1的age属性依赖了objx2的weight属性，但是由于计算属性的响应式效果仅对自己有效，它不能做到对外部依赖也有效果。
+因此，当objx2.weight发生变化当时候，objx1并不能知道这个变化，它的age属性也就不会变，继续使用缓存，这就会造成错误。
 为了解决这个问题，我提供了$bind方法，它可以绑定两个objext实例的相关属性，保证可以做到正常响应。
 
 ```js
-objx1.$bind('age', { target: objx2, name: 'objx2', dependency: 'weight' })
-// 或者：
-objx1.$bind('age', { objx2, dependency: 'weight' })
+objx1.$bind('age', objx2)
 ```
+
+从它的使用上看，它是后置的，开发者要自己去绑定计算属性中包含其他实例的情况的问题。如果你不去绑定，就会遇到我上面说到的问题，记住，计算属性是使用缓存的。
 
 - key: 自己的哪个计算属性是要被绑定的，注意，不支持keyPath形式，因为计算属性都是当前实例的顶级属性
-  - ?target: 要绑定的目标实例
-  - ?name: 作为计算属性的什么名字使用
-  - ?x: target和name可以合并，直接像上面这种传参方式，内部自动识别
-  - dependency: 目标实例上要绑定的属性路径
+- target: 要绑定的目标实例
 
-使用$bind可以显著提升计算属性的能力，它扩展原生计算属性的功能，可以给计算属性的计算器传入参数，而传入的参数就是$bind给的target。例如：
-
-```js
-const objx1 = new Objext({
-  get age({ objx2, objx3 }) {
-    let age2 = objx2 ? objx2.age : 0
-    let age3 = objx3 ? objx3.age : 0
-    return (age2 + age3) / 2
-  }
-})
-objx1.$bind('age', { objx2, dependency: 'age' })
-objx1.$bind('age', { objx3, dependency: 'age' })
-```
-
-上面这段代码让你的计算属性支持两个参数，而这两个参数就是$bind里面的target，而且是按顺序传入。
-在这样用的时候要注意：
-
-- 当objext实例化的时候，计算属性会被运行，这也就意味着这个时候objx2和objx3还没有被载入，因此，一定要在计算属性的计算器中做好逻辑判断，否则程序就会报错。
-- name是唯一的，如果你传入的name已经存在，原来的会先被解绑，然后再绑定新的
-- 所有计算属性的参数是相同的（顺序也必须相同），你不能在两个计算属性计算器中使用不同的参数。
-- 绑定之后，计算属性会重新计算一次，但不会触发watchers
+通过$bind绑定之后，计算属性会被重新计算一次，可能触发watcher。
 
 ### $unbind(key, target)
 
 解绑其他objext实例。
 
-解绑需要注意：
-
-- 解绑后计算属性中的参数值会发生变化，造成计算属性计算结果的变化（但不会触发watchers)
-- 如果不传target，表示把key相关的所有target给解绑
+解绑后计算属性中的参数值会发生变化，造成计算属性计算结果的变化，可能触发watcher。
+如果不传target，表示把key相关的所有target给解绑。
 
 ### $clone()
 

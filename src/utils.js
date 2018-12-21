@@ -186,7 +186,7 @@ export function isEmpty(value) {
     return value.length === 0
   }
   else if (isObject(value)) {
-    return Object.keys(value).length
+    return Object.keys(value).length === 0
   }
   else if (typeof value === 'string') {
     return value === ''

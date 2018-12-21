@@ -123,4 +123,24 @@ describe('测试数据响应', () => {
     })
     objx.think.size = 'small'
   })
+
+  test('对其他实例有依赖关系', (done) => {
+    let susan = new Objext({
+      name: 'susan',
+      age: 31,
+    })
+    let tomy = new Objext({
+      name: 'tomy',
+      get age() {
+        return susan ? susan.age - 20 : 0
+      },
+    })
+    tomy.$bind('age', susan)
+    // 当susan年龄变为32时，希望tomy的年龄自动变为12
+    tomy.$watch('age', () => {
+      expect(tomy.age).toBe(12)
+      done()
+    })
+    susan.age = 32
+  })
 })
