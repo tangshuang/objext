@@ -629,21 +629,24 @@ export class Objext {
   /**
    * 绑定两个objext实例，当目标实例的被依赖属性值发生变化时，重新计算当前实例的值。
    * 仅用于计算属性。
-   * @param {*} key 自己的计算属性
-   * @param {object} refer
-   *  - target 目标实例
-   *  - dependency 目标实例被依赖的属性路径
+   * @param {string} key 自己的计算属性
+   * @param {object} target 目标实例
+   * @param {string} dependency 目标实例被依赖的属性路径
    * @example
    * const objx2 = new Objext({
-   *   body: { head: 12 }
+   *   body: {
+   *     head: 12
+   *   }
    * })
    * const objx = new Objext({
-   *   get weight({ objx2 }) { return objx2.body.head * 17.8 }
+   *   get weight({ objx2 }) {
+   *    return objx2.body.head * 17.8
+   *   },
    * })
-   * objx.$bind('weight', { objx2, dependency: 'body.head' })
+   * objx.$bind('weight', objx2)
    * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
-  $bind(key, target) {
+  $bind(key, target, dependency) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
@@ -667,14 +670,18 @@ export class Objext {
       this.$unbind(key, target)
     }
 
-    // 加入依赖列表
-    let refer = {
-      key,
-      target,
-      callback,
-      dependency: ''
+    // 如果传了dependency，则更快处理
+    if (dependency) {
+      refers.push({
+        key,
+        target,
+        dependency,
+        callback,
+      })
+      target.$watch(dependency, callback, true)
+      this.$__compute(key)
+      return this
     }
-    refers.push(refer)
 
     // 重写target的依赖收集器
     target.$__collect = () => {
@@ -683,18 +690,23 @@ export class Objext {
         return target
       }
 
-      let { dependency, callback } = target.$__dep
-      if (!dependency || !callback) {
+      let { key, dependency, callback, refers } = target.$__dep
+      if (!key || !dependency || !callback || !refers) {
         return target
       }
 
       // 已经收集过了，就不再进行收集
-      if (refers.some(item => item.callback === callback && item.dependency === dependency && item.target === target)) {
+      if (refers.some(item => item.key === key && item.target === target && item.dependency === dependency)) {
         return target
       }
 
       // 多重依赖收集
-      refer.dependency = dependency
+      refers.push({
+        key,
+        target,
+        dependency,
+        callback,
+      })
       target.$watch(dependency, callback, true)
 
       return target
@@ -702,7 +714,8 @@ export class Objext {
 
     // getter执行过程中会有依赖收集
     let oldData = this.valueOf()
-    target.$define('$__dep', { callback })
+    // 加入依赖列表
+    target.$define('$__dep', { key, callback, refers })
     let newValue = getter.call(this)
     assign(this.$__data, key, valueOf(newValue))
     target.$define('$__dep', {})
@@ -718,8 +731,9 @@ export class Objext {
    * 解除绑定
    * @param {*} key
    * @param {*} target
+   * @param {string} dependency 指定要解绑的目标属性
    */
-  $unbind(key, target) {
+  $unbind(key, target, dependency) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
@@ -728,7 +742,7 @@ export class Objext {
     const refers = this.$__refers
     // 将原有的依赖清除先
     refers.forEach((item, i) => {
-      if (item.key === key && (target === undefined || item.target === target)) {
+      if (item.key === key && (target === undefined || item.target === target) && (target !== undefined && (dependency === undefined || dependency === item.dependency))) {
         item.target.$unwatch(item.dependency, item.callback)
         refers.splice(i, 1)
       }
@@ -802,7 +816,8 @@ export class Objext {
       return this
     }
 
-    let listeners = this.$__listeners.filter(item => item.path === path || (item.deep && path.toString().indexOf(item.path + '.') === 0))
+    let match = path.toString()
+    let listeners = this.$__listeners.filter(item => item.path === path || (item.deep && (match.indexOf(item.path + '.') === 0 || match.indexOf(item.path + '[') === 0)))
     let propagation = true
     let pipeline = true
     let stopPropagation = () => propagation = false
