@@ -135,7 +135,7 @@ describe('测试数据响应', () => {
         return susan ? susan.age - 20 : 0
       },
     })
-    tomy.$bind('age', susan)
+    tomy.$depend('age', susan)
     // 当susan年龄变为32时，希望tomy的年龄自动变为12
     tomy.$watch('age', () => {
       expect(tomy.age).toBe(12)

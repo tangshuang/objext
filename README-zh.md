@@ -292,7 +292,7 @@ objx.$batchEnd()
 - key: 要设置的属性名。注意，不支持keyPath方式，因为计算属性相对于当前对象。
 - getter: getter函数。
 
-### $bind(key, target)
+### $depend(key, target)
 
 绑定一个计算属性和其他objext实例。
 当一个objext实例的某个计算属性依赖另外一个objext实例的某个属性的时候用。
@@ -311,7 +311,7 @@ const objx1 = new Objext({
 为了解决这个问题，我提供了$bind方法，它可以绑定两个objext实例的相关属性，保证可以做到正常响应。
 
 ```js
-objx1.$bind('age', objx2)
+objx1.$depend('age', objx2)
 ```
 
 从它的使用上看，它是后置的，开发者要自己去绑定计算属性中包含其他实例的情况的问题。如果你不去绑定，就会遇到我上面说到的问题，记住，计算属性是使用缓存的。
@@ -321,12 +321,20 @@ objx1.$bind('age', objx2)
 
 通过$bind绑定之后，计算属性会被重新计算一次，可能触发watcher。
 
-### $unbind(key, target)
+### $undepend(key, target)
 
 解绑其他objext实例。
 
 解绑后计算属性中的参数值会发生变化，造成计算属性计算结果的变化，可能触发watcher。
 如果不传target，表示把key相关的所有target给解绑。
+
+### $bind(key, target)
+
+将一个计算属性的计算器中的this绑定为target，也就是说，计算器中的this指代的是target，而非当前objext实例。
+
+### $unbind(key)
+
+接触用$bind绑定的this指向。
 
 ### $clone()
 

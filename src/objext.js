@@ -588,7 +588,7 @@ export class Objext {
 
     // getter执行过程中会有依赖收集
     this.$define('$__dep', { key })
-    let newValue = getter.call(this)
+    let newValue = getter.call(getter.$__context || this)
     assign(this.$__data, key, valueOf(newValue))
     this.$define('$__dep', {})
 
@@ -643,10 +643,10 @@ export class Objext {
    *    return objx2.body.head * 17.8
    *   },
    * })
-   * objx.$bind('weight', objx2)
+   * objx.$depend('weight', objx2)
    * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
-  $bind(key, target, dependency) {
+  $depend(key, target, dependency) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
@@ -667,7 +667,7 @@ export class Objext {
     let index = refers.findIndex(item => item.key == key && item.target === target)
     // 如果已经存在这个name了，那么要先解绑
     if (index > -1) {
-      this.$unbind(key, target)
+      this.$undepend(key, target)
     }
 
     // 如果传了dependency，则更快处理
@@ -716,7 +716,7 @@ export class Objext {
     let oldData = this.valueOf()
     // 加入依赖列表
     target.$define('$__dep', { key, callback, refers })
-    let newValue = getter.call(this)
+    let newValue = getter.call(getter.$__context || this)
     assign(this.$__data, key, valueOf(newValue))
     target.$define('$__dep', {})
     let newData = this.valueOf()
@@ -733,7 +733,7 @@ export class Objext {
    * @param {*} target
    * @param {string} dependency 指定要解绑的目标属性
    */
-  $unbind(key, target, dependency) {
+  $undepend(key, target, dependency) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
@@ -754,6 +754,26 @@ export class Objext {
     let newData = this.valueOf()
     this.$dispatch(key, newData, oldData)
 
+    return this
+  }
+
+  $bind(key, target) {
+    // 非计算属性不支持
+    if (!this.$__computers[key]) {
+      return this
+    }
+
+    this.$__computers[key].$__context = target
+    return this
+  }
+
+  $unbind(key) {
+    // 非计算属性不支持
+    if (!this.$__computers[key]) {
+      return this
+    }
+
+    delete this.$__computers[key].$__context
     return this
   }
 
