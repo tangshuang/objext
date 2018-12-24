@@ -765,16 +765,20 @@ export class Objext {
     }
 
     this.$__contexts[key] = target
+    this.$depend(key, target)
     return this
   }
 
-  $unbind(key) {
+  $unbind(key, target) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
     }
 
     delete this.$__contexts[key]
+    if (target) {
+      this.$undepend(key, target)
+    }
     return this
   }
 
