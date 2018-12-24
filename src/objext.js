@@ -769,16 +769,19 @@ export class Objext {
     return this
   }
 
-  $unbind(key, target) {
+  $unbind(key) {
     // 非计算属性不支持
     if (!this.$__computers[key]) {
       return this
     }
 
-    delete this.$__contexts[key]
-    if (target) {
-      this.$undepend(key, target)
+    let target = this.$__contexts[key]
+    if (!target) {
+      return this
     }
+
+    delete this.$__contexts[key]
+    this.$undepend(key, target)
     return this
   }
 
