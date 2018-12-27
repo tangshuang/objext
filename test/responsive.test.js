@@ -136,11 +136,36 @@ describe('测试数据响应', () => {
       },
     })
     tomy.$depend('age', susan)
+
     // 当susan年龄变为32时，希望tomy的年龄自动变为12
     tomy.$watch('age', () => {
       expect(tomy.age).toBe(12)
       done()
     })
+
+    susan.age = 32
+  })
+
+  test('绑定this为另外一个objext', (done) => {
+    let tomy = new Objext({
+      name: 'tomy',
+      get height() {
+        return this.age ? (this.age - 20) * 10 : 0 // 通过$bind，将这里的this指向susan
+      },
+    })
+    let susan = new Objext({
+      name: 'susan',
+      age: 31,
+      child: tomy,
+    })
+    susan.child.$bind(susan)
+
+    // 当susan年龄变为32时，希望tomy的身高自动变为120
+    susan.child.$watch('height', () => {
+      expect(susan.child.height).toBe(120)
+      done()
+    })
+
     susan.age = 32
   })
 })

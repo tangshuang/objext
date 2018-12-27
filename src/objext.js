@@ -33,7 +33,7 @@ export class Objext {
     this.$define('$__deps', [])
     this.$define('$__refers', [])
     this.$define('$__computers', {}) // 用于收集所有计算器
-    this.$define('$__contexts', {}) // 用于绑定计算器的上下文
+    this.$define('$__context', null) // 用于绑定计算器的上下文
     this.$define('$__listeners', [])
 
     this.$define('$__parent', null)
@@ -589,7 +589,7 @@ export class Objext {
 
     // getter执行过程中会有依赖收集
     this.$define('$__dep', { key })
-    let newValue = getter.call(this.$__contexts[key] || this)
+    let newValue = getter.call(this.$__context || this)
     assign(this.$__data, key, valueOf(newValue))
     this.$define('$__dep', {})
 
@@ -717,7 +717,7 @@ export class Objext {
     let oldData = this.valueOf()
     // 加入依赖列表
     target.$define('$__dep', { key, callback, refers })
-    let newValue = getter.call(this.$__contexts[key] || this)
+    let newValue = getter.call(this.$__context || this)
     assign(this.$__data, key, valueOf(newValue))
     target.$define('$__dep', {})
     let newData = this.valueOf()
@@ -758,30 +758,29 @@ export class Objext {
     return this
   }
 
-  $bind(key, target) {
-    // 非计算属性不支持
-    if (!this.$__computers[key]) {
-      return this
+  /**
+   * 将当前实例的计算属性中的this重新指向另外一个objext实例
+   * 一般会在当前实例作为另外一个实例的子属性时使用，
+   * @param {*} context
+   */
+  $bind(context) {
+    if (isInstanceOf(context, Objext) && context !== this) {
+      this.$define('$__context', context)
+
+      let keys = Object.keys(this.$__computers)
+      keys.forEach((key) => {
+        this.$depend(key, context)
+      })
     }
+    // 如果context为非objext实例，则删除绑定关系
+    else {
+      this.$define('$__context', null)
 
-    this.$__contexts[key] = target
-    this.$depend(key, target)
-    return this
-  }
-
-  $unbind(key) {
-    // 非计算属性不支持
-    if (!this.$__computers[key]) {
-      return this
+      let keys = Object.keys(this.$__computers)
+      keys.forEach((key) => {
+        this.$undepend(key, context)
+      })
     }
-
-    let target = this.$__contexts[key]
-    if (!target) {
-      return this
-    }
-
-    delete this.$__contexts[key]
-    this.$undepend(key, target)
     return this
   }
 
@@ -945,7 +944,7 @@ export class Objext {
     let listeners = [].concat(this.$__listeners)
     let deps = [].concat(this.$__deps)
     let computers = Object.assign({}, this.$__computers)
-    let contexts = Object.assign({}, this.$__contexts)
+    let context = this.$__context
     let refers = [].concat(this.$__refers)
 
     let item = {
@@ -955,7 +954,7 @@ export class Objext {
       deps,
       computers,
       refers,
-      contexts,
+      context,
     }
 
     if (i > -1) {
@@ -971,7 +970,7 @@ export class Objext {
     this.$define('$__listeners', [].concat(listeners))
     this.$define('$__deps', [].concat(deps))
     this.$define('$__computers', Object.assign({}, computers))
-    this.$define('$__contexts', Object.assign({}, contexts))
+    this.$define('$__context', context)
     this.$define('$__refers', [].concat(refers))
 
     // 还原计算属性
@@ -1004,14 +1003,14 @@ export class Objext {
       return this
     }
 
-    let { data, listeners, deps, computers, refers, contexts } = item
+    let { data, listeners, deps, computers, refers, context } = item
 
     this.$define('$__data', {})
     this.$put(clone(data))
     this.$define('$__listeners', [].concat(listeners))
     this.$define('$__deps', [].concat(deps))
     this.$define('$__computers', Object.assign({}, computers))
-    this.$define('$__contexts', Object.assign({}, contexts))
+    this.$define('$__context', context)
     this.$define('$__refers', [].concat(refers))
 
     // 还原计算属性
@@ -1233,7 +1232,7 @@ export class Objext {
     let deps = this.$__deps
     let listeners = this.$__listeners
     let computers = this.$__computers
-    let contexts = this.$__contexts
+    let context = this.$__context
     let refers = this.$__refers
 
     objx.$put(value)
@@ -1243,7 +1242,7 @@ export class Objext {
       objx.$define('$__deps', [].concat(deps))
       objx.$define('$__listeners', [].concat(listeners))
       objx.$define('$__computers', Object.assign({}, computers))
-      this.$define('$__contexts', Object.assign({}, contexts))
+      this.$define('$__context', context)
       objx.$define('$__refres', [].concat(refers))
     }
 

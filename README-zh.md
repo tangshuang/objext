@@ -328,15 +328,18 @@ objx1.$depend('age', objx2)
 解绑后计算属性中的参数值会发生变化，造成计算属性计算结果的变化，可能触发watcher。
 如果不传target，表示把key相关的所有target给解绑。
 
-### $bind(key, target)
+### $bind(context)
 
-将一个计算属性的计算器中的this绑定为target，也就是说，计算器中的this指代的是target，而非当前objext实例。
+将当前objext实例的所有计算属性计算器中的this绑定为context，也就是说，计算器中的this指代的是context，而非当前objext实例本身。
+context必须为另外一个context实例。
+$bind具有$depend的功效，因此，如果你执行了$bind，可以不用再执行$depend。
 
-### $unbind(key)
+要解除绑定，只需要运行`objx.$bind(false)`即可。
 
-接触用$bind绑定的this指向。
+一般而言，这种用法只会在开发者明确知道自己要做绑定操作。否则在撰写计算器时极容易出错。
 
-*注意* $depend和$bind独立于objext本身的数据，他不操作计算器本身，而是在objext实例的整个生命周期有效。举个例子，如果你事先绑定了一个objx作为this，那么当你使用$put之后，希望新的计算器不绑定objx，那么必须手动调用$unbind，因为之前$bind的结果，对新的计算器仍然有效。
+*注意* $depend和$bind独立于objext本身的数据，他不操作计算器本身，而是在objext实例的整个生命周期有效。
+举个例子，如果你事先绑定了一个objx作为this，那么当你使用$put之后，希望新的计算器不绑定objx，那么必须手动调用$bind(false)，因为之前$bind的结果，对新的计算器仍然有效。
 
 ### $clone()
 
