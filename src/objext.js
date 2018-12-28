@@ -1284,6 +1284,12 @@ export class Objext {
     this.$define('$__sources', null)
     this.$put({})
   }
+  /**
+   * 获取数据，和valueOf不一样，它获取数据直接从$__data上取，效率更高
+   */
+  $data() {
+    return valueOf(this.$__data)
+  }
   valueOf() {
     return valueOf(this)
   }
