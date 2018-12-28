@@ -645,7 +645,7 @@ export class Objext {
    *   },
    * })
    * objx.$depend('weight', objx2)
-   * 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
+   * // 这样，当objx2.body.head发生变化的时候，objx的weight属性会重新计算，并将结果缓存起来
    */
   $depend(key, target, dependency) {
     // 非计算属性不支持
@@ -1130,7 +1130,7 @@ export class Objext {
       }
       let { validate, message, warn, path, determine, deferred } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
       let key = path === '*' || isEmpty(path) ? '' : path
-      let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this, key)
+      let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this.valueOf(), key)
 
       // 某些情况下不检查该字段
       if (isFunction(determine) && !determine.call(this, value)) {
@@ -1162,7 +1162,7 @@ export class Objext {
     // 仅传了keyPath不传next的情况下才向下传递
     const validateChild = (keyPath) => {
       let key = keyPath === '*' ? '' : keyPath
-      let child = parse(this, key)
+      let child = parse(this.valueOf(), key)
       if (isInstanceOf(child, Objext)) {
         let res = child.$validate() // 向下传递的时候，就全量校验
         if (isInstanceOf(res, Error)) {
