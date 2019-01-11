@@ -1110,7 +1110,7 @@ export class Objext {
     let argsLen = arguments.length
 
     const createError = ({ path, value, message, warn }) => {
-      let msg = isFunction(message) ? message.call(this, { path, value }) : message // message支持函数
+      let msg = isFunction(message) ? message.call(this.$__context || this, { path, value }) : message // message支持函数
       let error = new Error(msg)
       defineProperties(error, {
         value,
@@ -1118,7 +1118,7 @@ export class Objext {
         target: this,
       })
       if (isFunction(warn)) {
-        warn.call(this, error)
+        warn.call(this.$__context || this, error)
       }
       return error
     }
@@ -1133,7 +1133,7 @@ export class Objext {
       let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this.valueOf(), key)
 
       // 某些情况下不检查该字段
-      if (isFunction(determine) && !determine.call(this, value)) {
+      if (isFunction(determine) && !determine.call(this.$__context || this, value)) {
         if (deferred) {
           deferers.push(Promise.resolve())
         }
@@ -1142,7 +1142,7 @@ export class Objext {
 
       // 异步校验部分
       if (deferred) {
-        let deferer = Promise.resolve().then(() => validate.call(this, value)).then((bool) => {
+        let deferer = Promise.resolve().then(() => validate.call(this.$__context || this, value)).then((bool) => {
           if (!bool) {
             return createError({ path, value, message, warn })
           }
@@ -1151,7 +1151,7 @@ export class Objext {
         continue
       }
 
-      let bool = validate.call(this, value)
+      let bool = validate.call(this.$__context || this, value)
       if (!bool) {
         result = createError({ path, value, message, warn })
         break
