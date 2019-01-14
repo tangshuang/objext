@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<title>测试生成一个含有数组的对象</title>
+
+<script src="../src/objext.js"></script>
+<script>
+const { Objext } = window.objext
+const objx = new Objext({
+  items: [
+    { id: 10, name: 'honey' },
+    { id: 20, name: null }
+  ]
+})
+console.log(objx)
+</script>

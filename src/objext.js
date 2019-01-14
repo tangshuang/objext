@@ -1106,11 +1106,9 @@ export class Objext {
    * @return {Error} 一个Error的实例，message是校验器中设置的，同时，它附带两个属性（value, path），并且它会被传给校验器中的warn函数
    */
   $validate(keyPath, next) {
-    let isEmptyKeyPath = keyPath === undefined || keyPath === null
-    let result = null
-    let validators = this.$__validators.filter(item => isEmptyKeyPath || item.path === keyPath) // keyPath不传的时候，校验全部验证规则
-    let deferers = []
-    let argsLen = arguments.length
+    const argsLen = arguments.length
+    const isEmptyKeyPath = argsLen === 0 || isEmpty(keyPath)
+    const validators = this.$__validators.filter(item => isEmptyKeyPath || item.path === keyPath) // keyPath不传的时候，校验全部验证规则
 
     const createError = ({ path, value, message, warn }) => {
       let msg = isFunction(message) ? message.call(this.$__context || this, { path, value }) : message // message支持函数
@@ -1126,31 +1124,30 @@ export class Objext {
       return error
     }
 
+    let result = null
+
     for (let i = 0, len = validators.length; i < len; i ++) {
       let item = validators[i]
       if (!isObject(item)) {
         continue
       }
+
       let { validate, message, warn, path, determine, deferred } = item // 这里path是必须的，当参数path为undefined的时候，要通过这里来获取
       let key = path === '*' || isEmpty(path) ? '' : path
-      let value = argsLen === 2 && !isEmptyKeyPath ? next : parse(this.valueOf(), key)
+      let value = argsLen >= 2 && !isEmptyKeyPath ? next : parse(this.valueOf(), key)
 
       // 某些情况下不检查该字段
       if (isFunction(determine) && !determine.call(this.$__context || this, value)) {
-        if (deferred) {
-          deferers.push(Promise.resolve())
-        }
         continue
       }
 
       // 异步校验部分
       if (deferred) {
-        let deferer = Promise.resolve().then(() => validate.call(this.$__context || this, value)).then((bool) => {
+        Promise.resolve().then(() => validate.call(this.$__context || this, value)).then((bool) => {
           if (!bool) {
             return createError({ path, value, message, warn })
           }
         })
-        deferers.push(deferer)
         continue
       }
 
@@ -1161,11 +1158,10 @@ export class Objext {
       }
     }
 
-    // 向下传递
-    // 仅传了keyPath不传next的情况下才向下传递
+    // 向下传递，检查当前被检查的属性的子属性的校验规则
     const validateChild = (keyPath) => {
       let key = keyPath === '*' ? '' : keyPath
-      let child = parse(this.valueOf(), key)
+      let child = parse(this, key)
       if (isInstanceOf(child, Objext)) {
         let res = child.$validate() // 向下传递的时候，就全量校验
         if (isInstanceOf(res, Error)) {

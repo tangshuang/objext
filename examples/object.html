@@ -3,6 +3,7 @@
 
 <script src="../src/objext.js"></script>
 <script>
+const { Objext } = window.objext
 function sleep(ms = 16) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -19,26 +20,26 @@ async function test() {
     },
   }
   var objx = new Objext(origin)
-  
+
   // 创建
   console.log(objx)
   await sleep()
-  
+
   // 修改值
   objx.body.hand = false
   console.log(objx.body.hand)
   await sleep()
-  
+
   // 设置新值
   // objx.$set('body.foot') = true
   // console.log(objx.body.foot)
   // await sleep()
-  
+
   // 删除值
   // delete objx.body.head
   // console.log(objx)
   // await sleep()
-  
+
   // // 正常的获取
   // console.log(objx.name)
   // console.log(objx.books[0].price)

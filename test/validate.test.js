@@ -38,4 +38,20 @@ describe('对数据进行校验', () => {
     let fn = () => objx.$validate()
     expect(fn).toThrowError('age必须为数字')
   })
+  test('校验某个属性的子属性', () => {
+    let objx = new Objext({
+      items: [
+        { id: 10, name: 'honey' },
+        { id: 20, name: null }
+      ]
+    })
+    objx.items[1].$formulate({
+      path: 'name',
+      validate: value => typeof value === 'string',
+      message: 'name必须为字符串xxx',
+      warn: (error) => { throw error },
+    })
+    let fn = () => objx.$validate('items')
+    expect(fn).toThrowError('name必须为字符串xxx')
+  })
 })
