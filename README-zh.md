@@ -68,7 +68,7 @@ keyPath是指获取一个属性节点的路径，例如获取objx.body.head.hair
 
 注意：$get得到的结果，是objext数据的一份拷贝，对该结果进行任何操作，都不会影响objext的当前数据。而且，还要考虑计算属性的问题，get得到的结果，会把计算属性转化为值，从而丢失计算的特性。
 
-### $set(keyPath, value)
+### $set(keyPath, value, dispatch)
 
 和$get的好处一样，普通对象你不能读取一个undefined属性的子属性，更别提给它赋值。而$set就可以做到，它可以为一个不存在的深层次的属性进行赋值：
 
@@ -79,6 +79,8 @@ objx.$set('body.head.hair', 'black')
 ```
 
 更重要的是，只有通过$set方法，才能让一个属性具备可响应式能力。比如你直接objx.feet = 2，feet这个属性不是响应式的，你不能用$watch去监听它。但是你objx.$set('feet', 2)之后，它就是响应式了。也就是说，必须用$set来添加属性，而不能直接像object属性赋值一样。
+
+`dispatch`用于是否安静更新值，默认为true，表示会触发对应keyPath的watcher，而如果把`dispatch`设为false，则不会触发，实现静默更新值。
 
 ### $remove(keyPath)
 

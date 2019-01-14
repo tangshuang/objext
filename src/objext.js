@@ -95,8 +95,9 @@ export class Objext {
    * 设置一个普通值属性
    * @param {*} path
    * @param {*} value
+   * @param {boolean} dispatch 是否触发watcher，默认为true，设为false时，更新值不会触发dispatch
    */
-  $set(path, value) {
+  $set(path, value, dispatch = true) {
     if (this.$isLocked()) {
       return this
     }
@@ -294,7 +295,9 @@ export class Objext {
 
     // 触发watch绑定的回调函数
     // 注意，批量开启时，不会触发，触发逻辑都在dispatch方法中
-    this.$dispatch(path, newData, oldData)
+    if (dispatch) {
+      this.$dispatch(path, newData, oldData)
+    }
 
     return this
   }
