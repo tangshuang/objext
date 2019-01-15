@@ -396,13 +396,19 @@ export function defineProperties(target, options, configurable = true) {
 export function sortBy(items, keyPath) {
   let res = [].concat(items)
   res.sort((a, b) => {
-    if (parse(a, keyPath) < parse(b, keyPath)) {
+    let oa = parse(a, keyPath)
+    let ob = parse(b, keyPath)
+
+    oa = typeof oa === 'number' && !isNaN(oa) ? oa : 10
+    ob = typeof ob === 'number' && !isNaN(ob) ? ob : 10
+
+    if (oa < ob) {
       return -1
     }
-    if (parse(a, keyPath) === parse(b, keyPath)) {
+    if (oa === ob) {
       return 0
     }
-    if (parse(a, keyPath) > parse(b, keyPath)) {
+    if (oa > ob) {
       return 1
     }
   })
