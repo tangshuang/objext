@@ -392,3 +392,19 @@ export function defineProperties(target, options, configurable = true) {
     defineProperty(target, prop, options[prop], configurable)
   })
 }
+
+export function sortBy(items, keyPath) {
+  let res = [].concat(items)
+  res.sort((a, b) => {
+    if (parse(a, keyPath) < parse(b, keyPath)) {
+      return -1
+    }
+    if (parse(a, keyPath) === parse(b, keyPath)) {
+      return 0
+    }
+    if (parse(a, keyPath) > parse(b, keyPath)) {
+      return 1
+    }
+  })
+  return res
+}

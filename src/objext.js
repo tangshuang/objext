@@ -19,6 +19,7 @@ import {
   defineProperty,
   defineProperties,
   valueOf,
+  sortBy,
 } from './utils'
 
 export class Objext {
@@ -1091,6 +1092,7 @@ export class Objext {
    *        message: '头必须是一个对象',
    *        warn: (error) => {},
    *        deferred: true, // 是否异步校验，异步校验不会中断校验过程，从当前进程中脱离出去，而是交给异步进程去处理，如果全部校验器都是异步的,$validate会返回一个promise
+   *        order: 10, // 校验的顺序，从小到大排序
    *    }
    * ]
    */
@@ -1108,7 +1110,8 @@ export class Objext {
   $validate(keyPath, next) {
     const argsLen = arguments.length
     const isEmptyKeyPath = argsLen === 0 || isEmpty(keyPath)
-    const validators = this.$__validators.filter(item => isEmptyKeyPath || item.path === keyPath) // keyPath不传的时候，校验全部验证规则
+    const foundvalidators = this.$__validators.filter(item => item && (isEmptyKeyPath || item.path === keyPath)) // keyPath不传的时候，校验全部验证规则
+    const validators = sortBy(foundvalidators, 'order')
 
     const createError = ({ path, value, message, warn }) => {
       let msg = isFunction(message) ? message.call(this.$__context || this, { path, value }) : message // message支持函数
