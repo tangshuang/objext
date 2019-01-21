@@ -6,7 +6,9 @@ import {
   isArray,
   inArray,
   isInstanceOf,
+  isString,
   isEmpty,
+  isUndefined,
   uniqueArray,
   each,
   setProto,
@@ -542,7 +544,7 @@ export class Objext {
           newData,
         }
         // 对于老数据，只用最开始那个，后面的oldData其实都不是真正的oldData
-        if (typeof batch[path].oldData === 'undefined') {
+        if (isUndefined(batch[path].oldData)) {
           batch[path].oldData = oldData
         }
       })
@@ -790,11 +792,22 @@ export class Objext {
 
   /**
    * 添加一个watch回调
-   * @param {*} path
+   * @param {string|array} path
    * @param {*} fn
    * @param {*} deep
    */
   $watch(path, fn, deep) {
+    // 数组，则一次性添加多个
+    if (isArray(path)) {
+      path.forEach((path) => this.$watch(path, fn, deep))
+      return this
+    }
+
+    // 不是字符串则不允许设置
+    if (!isString(path) && !path) {
+      return this
+    }
+
     path = makeKeyPath(makeKeyChain(path))
 
     this.$__listeners.push({
@@ -1309,5 +1322,6 @@ Objext.inArray = inArray
 Objext.inObject = inObject
 Objext.isEqual = isEqual
 Objext.isEmpty = isEmpty
+Objext.isInstanceOf = isInstanceOf
 
 export default Objext

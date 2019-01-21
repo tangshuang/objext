@@ -181,6 +181,14 @@ export function isInstanceOf(ins, cons) {
   return ins instanceof cons
 }
 
+export function isString(value) {
+  return typeof value === 'string'
+}
+
+export function isUndefined(value) {
+  return typeof value === 'undefined'
+}
+
 export function isEmpty(value) {
   if (isArray(value)) {
     return value.length === 0
