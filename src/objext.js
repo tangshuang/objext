@@ -92,7 +92,7 @@ export class Objext {
    * @param {*} path
    */
   $get(path) {
-    return parse(this, path)
+    return this.$has(path) ? parse(this, path) : undefined
   }
   /**
    * 设置一个普通值属性
@@ -362,7 +362,7 @@ export class Objext {
    * @param {*} path
    */
   $has(path) {
-    let target = this
+    let target = this.$__data
     let chain = makeKeyChain(path)
 
     for (let i = 0, len = chain.length; i < len; i ++) {
