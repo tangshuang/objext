@@ -242,7 +242,7 @@ console.log(objx.name) // => 'tomy'
 Objext的实例可以链式操作：
 
 ```js
-objx.$slient(true).$set('name', 'lily').$slient(false)
+objx.$silent(true).$set('name', 'lily').$silent(false)
 ```
 
 这行代码可以不触发watch的情况下更新name属性。
@@ -264,14 +264,14 @@ objx.$slient(true).$set('name', 'lily').$slient(false)
 
 注意：$update和$put也会触发watch的东西，但是，它们是一次性触发的，在全部数据修改完之后，才会触发watch回调，而非每次修改一个属性就被触发。具体可以阅读下方的$batchStart/$batchEnd
 
-### $slient(is)
+### $silent(is)
 
 切换安静模式/响应式模式。is为true时，表示进入安静模式，所有的watchers都不会被触发。
 
 ```js
-objx.$slient(true)
+objx.$silent(true)
 objx.$set('name', 'lily')
-objx.$slient(false)
+objx.$silent(false)
 ```
 
 ### $batchStart() / $batchEnd()

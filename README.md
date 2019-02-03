@@ -264,7 +264,7 @@ Unlock data.
 You can use methods as chain like:
 
 ```js
-objx.$slient(true).$set('name', 'lily').$slient(false)
+objx.$silent(true).$set('name', 'lily').$silent(false)
 ```
 
 ### $put(data)
@@ -277,15 +277,15 @@ The current properties will be removed firstly, and new data will be set into ob
 Update existing data one time, watchers will only run after all data updated.
 If some properties do not exist, they will be added to the data.
 
-### $slient(is)
+### $silent(is)
 
-Change the slient mode. When slient mode is on, no watchers will be trigger when data change.
+Change the silent mode. When silent mode is on, no watchers will be trigger when data change.
 
 ```js
 objx.$watch('name', () => console.log('name changed.'))
-objx.$slient(true)
-objx.$set('name', 'lily') // this will not trigger watcher because of slient mode
-objx.$slient(false)
+objx.$silent(true)
+objx.$set('name', 'lily') // this will not trigger watcher because of silent mode
+objx.$silent(false)
 ```
 
 ### $batchStart() / $batchEnd()

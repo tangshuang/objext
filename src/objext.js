@@ -42,7 +42,7 @@ export class Objext {
     this.$define('$__parent', null)
     this.$define('$__key', '')
 
-    this.$define('$__slient', false)
+    this.$define('$__silent', false)
     this.$define('$__locked', false)
     this.$define('$__strict', false)
     this.$define('$__inited', false) // 用来记录是否已经塞过数据了
@@ -211,8 +211,8 @@ export class Objext {
         $isLocked: {
           value: prototypes.$isLocked.bind(xarr),
         },
-        $isSlient: {
-          value: prototypes.$isSlient.bind(xarr),
+        $issilent: {
+          value: prototypes.$issilent.bind(xarr),
         },
         $isStrict: {
           value: prototypes.$isStrict.bind(xarr),
@@ -497,18 +497,18 @@ export class Objext {
    * 是否禁止触发watch回调，以安静模式更新数据
    * @param {*} status 为true表示启用安静模式，执行完一些操作之后，要使用false关闭安静模式，否则永远都无法触发watch回调
    */
-  $slient(status) {
-    this.$define('$__slient', !!status)
+  $silent(status) {
+    this.$define('$__silent', !!status)
     return this
   }
-  $isSlient() {
-    if (this.$__slient) {
+  $issilent() {
+    if (this.$__silent) {
       return true
     }
 
     let parent = this.$__parent
     while (parent) {
-      if (parent.$__slient) {
+      if (parent.$__silent) {
         return true
       }
       parent = parent.$__parent
@@ -535,7 +535,7 @@ export class Objext {
     this.$__batch.length = 0
 
     // 不再触发dispatch操作
-    if (!this.$isSlient()) {
+    if (!this.$issilent()) {
       // 把收集到的变动集中起来，去重，得到最小集
       const batch = {}
       batches.forEach(({ path, newData, oldData }) => {
@@ -856,7 +856,7 @@ export class Objext {
       return this
     }
 
-    if (this.$isSlient()) {
+    if (this.$issilent()) {
       return this
     }
 
@@ -1290,7 +1290,7 @@ export class Objext {
     this.$define('$__parent', null)
     this.$define('$__key', '')
 
-    this.$define('$__slient', null)
+    this.$define('$__silent', null)
     this.$define('$__locked', null)
     this.$define('$__inited', null)
     this.$define('$__isBatchUpdate', null)
