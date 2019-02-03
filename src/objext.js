@@ -211,8 +211,8 @@ export class Objext {
         $isLocked: {
           value: prototypes.$isLocked.bind(xarr),
         },
-        $issilent: {
-          value: prototypes.$issilent.bind(xarr),
+        $isSilent: {
+          value: prototypes.$isSilent.bind(xarr),
         },
         $isStrict: {
           value: prototypes.$isStrict.bind(xarr),
@@ -501,7 +501,7 @@ export class Objext {
     this.$define('$__silent', !!status)
     return this
   }
-  $issilent() {
+  $isSilent() {
     if (this.$__silent) {
       return true
     }
@@ -535,7 +535,7 @@ export class Objext {
     this.$__batch.length = 0
 
     // 不再触发dispatch操作
-    if (!this.$issilent()) {
+    if (!this.$isSilent()) {
       // 把收集到的变动集中起来，去重，得到最小集
       const batch = {}
       batches.forEach(({ path, newData, oldData }) => {
@@ -856,7 +856,7 @@ export class Objext {
       return this
     }
 
-    if (this.$issilent()) {
+    if (this.$isSilent()) {
       return this
     }
 
