@@ -59,13 +59,6 @@ export class Objext {
     if (sources) {
       this.$put(sources)
     }
-
-    // 每当值发生变化时，hash被更新
-    this.$watch('*', ({ newValue, oldValue }) => {
-      if (!isEqual(newValue, oldValue)) {
-        this.$define('$hash', getStringHashcode(this.toString()))
-      }
-    })
   }
 
   /**
@@ -134,6 +127,9 @@ export class Objext {
           // 会冒泡上去
           let newData = clone(target.$__data)
           target.$dispatch(key, newData, oldData)
+
+          // 更新hash
+          target.$define('$hash', getStringHashcode(target.toString()))
         },
         get() {
           /**
@@ -201,6 +197,12 @@ export class Objext {
         },
         $__validators: {
           value: [],
+        },
+        $define: {
+          value: prototypes.$define.bind(xarr),
+        },
+        $enhance: {
+          value: prototypes.$enhance.bind(xarr),
         },
         $dispatch: {
           value: prototypes.$dispatch.bind(xarr),
@@ -302,6 +304,9 @@ export class Objext {
       this.$dispatch(path, newData, oldData)
     }
 
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
+
     return this
   }
   /**
@@ -354,6 +359,9 @@ export class Objext {
 
     let newData = this.valueOf()
     this.$dispatch(path, newData, oldData)
+
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
 
     return this
   }
@@ -490,6 +498,9 @@ export class Objext {
       this.$__compute(item.key)
     })
 
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
+
     return this
   }
 
@@ -598,6 +609,9 @@ export class Objext {
     let newValue = getter.call(this.$__context || this)
     assign(this.$__data, key, valueOf(newValue))
     this.$define('$__dep', {})
+
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
 
     return this
   }
@@ -732,6 +746,9 @@ export class Objext {
     // 删除方法重写，恢复默认动作
     delete target.$__collect
 
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
+
     return this
   }
   /**
@@ -760,6 +777,9 @@ export class Objext {
     this.$__compute(key)
     let newData = this.valueOf()
     this.$dispatch(key, newData, oldData)
+
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
 
     return this
   }
@@ -1035,6 +1055,9 @@ export class Objext {
       this.$describe(key, value)
     })
 
+    // 更新hash
+    this.$define('$hash', getStringHashcode(this.toString()))
+
     return this
   }
   /**
@@ -1265,6 +1288,9 @@ export class Objext {
     each(computers, (value, key) => {
       objx.$describe(key, value)
     })
+
+    // 更新hash
+    objx.$define('$hash', getStringHashcode(objx.toString()))
 
     return objx
   }
