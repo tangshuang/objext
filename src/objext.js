@@ -974,12 +974,12 @@ export class Objext {
       context,
     }
 
+    // 把已经存在的移除掉
     if (i > -1) {
-      snapshots[i] = item
+      snapshots.splice(i, 1)
     }
-    else {
-      snapshots.push(item)
-    }
+
+    snapshots.push(item)
 
     this.$define('$__data', {})
     this.$put(clone(data))
