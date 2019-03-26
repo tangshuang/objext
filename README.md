@@ -288,22 +288,22 @@ objx.$set('name', 'lily') // this will not trigger watcher because of silent mod
 objx.$silent(false)
 ```
 
-### $batchStart() / $batchEnd()
+### $start() / $end()
 
-During batch updating, watchers will not be triggered until $batchEnd() run.
+During batch updating, watchers will not be triggered until $end() run.
 
 ```js
-objx.$batchStart()
+objx.$start()
 // the following $set will not trigger watchers
 objx.$set('body.main', 'left')
 objx.$set('name', 'ceci')
 objx.$set('body.main', 'right')
-// when $batchEnd() run, all watchers will be invoked.
+// when $end() run, all watchers will be invoked.
 // the watchers of 'body.main' will only run once with final value 'right'
-objx.$batchEnd()
+objx.$end()
 ```
 
-`$update` and `$put` use $batchStart/$batchEnd inside.
+`$update` and `$put` use $start/$end inside.
 
 ### $clone()
 

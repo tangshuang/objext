@@ -435,7 +435,7 @@ export class Objext {
     let computed = []
     let normal = []
 
-    this.$batchStart()
+    this.$start()
 
     // 下面这个forEach结束后，可以得到一个完整的$__data，但是它上面保存着初始值，计算属性的值还需要进一步进行计算后得出
     keys.forEach((key) => {
@@ -487,7 +487,7 @@ export class Objext {
       this.$set(item.key, item.value)
     })
 
-    this.$batchEnd()
+    this.$end()
 
     // $__inited为true的情况下，才能进行依赖收集，否则不允许
     // 首次运行的时候，有些属性可能还没赋值上去，因为里面的this.xxx可能还是undefined，会引起一些错误，因此，必须将$__inited设置为false，阻止计算属性初始化操作
@@ -529,16 +529,16 @@ export class Objext {
   }
   /**
    * 开启批量更新模式
-   * 批量更新模式开启后，仅在执行batchEnd方法时才会触发watch回调，这样可以避免在一次批量操作中对同一个path进行了多次watch回调触发
+   * 批量更新模式开启后，仅在执行end方法时才会触发watch回调，这样可以避免在一次批量操作中对同一个path进行了多次watch回调触发
    */
-  $batchStart() {
+  $start() {
     this.$define('$__isBatchUpdate', true)
     return this
   }
   /**
    * 结束批量更新模式
    */
-  $batchEnd() {
+  $end() {
     const batches = [].concat(this.$__batch)
 
     // 重置信息，需要先重置，否则this.$dispatch不工作
