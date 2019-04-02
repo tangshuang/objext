@@ -39,7 +39,7 @@ export class Objext {
     this.$define('$__context', null) // 用于绑定计算器的上下文
     this.$define('$__listeners', [])
 
-    this.$define('$__parent', null)
+    this.$define('$parent', null)
     this.$define('$__key', '')
 
     this.$define('$__silent', false)
@@ -98,6 +98,8 @@ export class Objext {
       return this
     }
 
+    const $this = this
+
     function xdefine(target, key, value) {
       assign(target.$__data, key, valueOf(value)) // 一定要提前设置
       value = xcreate(value, key, target)
@@ -152,15 +154,16 @@ export class Objext {
         // 这里需要注意：当把一个objext实例作为子属性值加入另外一个objext的时候，会被修改$__key和$__parent，这要求该objext实例是独占的，如果被多处使用，会存在引用错误问题，解决的一种办法是使用$clone(true)创建一个完全备份
         let objx = value
         objx.$define('$__key', key)
-        objx.$define('$__parent', target)
+        objx.$define('$parent', target)
         target.$__data[key] = objx.$__data // 数据引用
 
         return objx
       }
       else if (isObject(value)) {
-        let objx = new Objext()
+        let Constructor = $this.constructor
+        let objx = new Constructor()
         objx.$define('$__key', key)
-        objx.$define('$__parent', target)
+        objx.$define('$parent', target)
         target.$__data[key] = objx.$__data // 数据引用
 
         objx.$put(value)
@@ -186,7 +189,7 @@ export class Objext {
         $__key: {
           value: key,
         },
-        $__parent: {
+        $parent: {
           value: target,
         },
         $__data: {
@@ -517,12 +520,12 @@ export class Objext {
       return true
     }
 
-    let parent = this.$__parent
+    let parent = this.$parent
     while (parent) {
       if (parent.$__silent) {
         return true
       }
-      parent = parent.$__parent
+      parent = parent.$parent
     }
 
     return false
@@ -946,7 +949,7 @@ export class Objext {
 
     // 向上冒泡
     if (propagation) {
-      let parent = this.$__parent
+      let parent = this.$parent
       let key = this.$__key
       if (parent && parent.$dispatch) {
         let parentNewData = parent.$__data
@@ -1106,12 +1109,12 @@ export class Objext {
       return true
     }
 
-    let parent = this.$__parent
+    let parent = this.$parent
     while (parent) {
       if (parent.$__locked) {
         return true
       }
-      parent = parent.$__parent
+      parent = parent.$parent
     }
 
     return false
@@ -1247,7 +1250,7 @@ export class Objext {
       return true
     }
 
-    let parent = this.$__parent
+    let parent = this.$parent
     while (parent) {
       if (parent.$__strict) {
         return true
@@ -1313,7 +1316,7 @@ export class Objext {
     this.$define('$__computers', null)
     this.$define('$__contexts', null)
 
-    this.$define('$__parent', null)
+    this.$define('$parent', null)
     this.$define('$__key', '')
 
     this.$define('$__silent', null)
