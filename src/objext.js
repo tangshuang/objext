@@ -25,7 +25,7 @@ import {
 } from './utils'
 
 export class Objext {
-  constructor(sources, ...args) {
+  constructor(sources, options = {}) {
     this.$define('$__snapshots', [])
     this.$define('$__validators', [])
 
@@ -51,7 +51,8 @@ export class Objext {
 
     this.$define('$__data', {})
     this.$define('$__sources', sources)
-    this.$init(sources, ...args)
+    this.$define('$__options', options)
+    this.$init(sources, options)
   }
 
   $init(sources) {
@@ -160,8 +161,9 @@ export class Objext {
         return objx
       }
       else if (isObject(value)) {
-        let Constructor = $this.constructor
-        let objx = new Constructor()
+        let newChildObjext = $this.$__options.newChildObjext // 支持options中传入一个newChildObjext来决定子属性对象应该怎么生成
+        let childObjext = isFunction(newChildObjext) ? newChildObjext(value) : null
+        let objx = childObjext && isInstanceOf(childObjext, Objext) ? childObjext : new Objext()
         objx.$define('$__key', key)
         objx.$define('$parent', target)
         target.$__data[key] = objx.$__data // 数据引用
@@ -1272,7 +1274,7 @@ export class Objext {
     const Constructor = this.constructor // 解决当有些类继承Objext时的问题
 
     let value = this.valueOf()
-    let objx = new Constructor(this.$__sources)
+    let objx = new Constructor(this.$__sources, this.$__options)
 
     let deps = this.$__deps
     let listeners = this.$__listeners
