@@ -434,6 +434,10 @@ export class Objext {
       return this
     }
 
+    if (!isObject(data)) {
+      return this
+    }
+
     let keys = Object.keys(data)
     let computed = []
     let normal = []
