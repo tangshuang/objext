@@ -25,7 +25,7 @@ import {
 } from './utils'
 
 export class Objext {
-  constructor(sources) {
+  constructor(sources, ...args) {
     this.$define('$__snapshots', [])
     this.$define('$__validators', [])
 
@@ -51,7 +51,7 @@ export class Objext {
 
     this.$define('$__data', {})
     this.$define('$__sources', sources)
-    this.$init(sources)
+    this.$init(sources, ...args)
   }
 
   $init(sources) {
