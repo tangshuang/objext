@@ -9,7 +9,6 @@ import {
   isString,
   isEmpty,
   isUndefined,
-  uniqueArray,
   each,
   setProto,
   makeKeyPath,
@@ -49,10 +48,11 @@ export class Objext {
     this.$define('$__isBatchUpdate', false) // 记录是否开启批量更新
     this.$define('$__batch', []) // 用来记录批量一次更新的内容
 
+    let _options = Object.assign({}, Objext.defaultOptions, options)
     this.$define('$__data', {})
     this.$define('$__sources', sources)
-    this.$define('$__options', options)
-    this.$init(sources, options)
+    this.$define('$__options', _options)
+    this.$init(sources, _options)
   }
 
   $init(sources) {
@@ -586,6 +586,21 @@ export class Objext {
       configurable: true,
       enumerable : true,
       get: () => {
+        /**
+         * 依赖收集
+         */
+        if (!isEmpty(this.$__dep)) {
+          this.$__dep.dependency = key
+          this.$__collect()
+        }
+
+        // 如果不需要使用缓存
+        let options = this.$__options
+        let { notCachedComputedProperties } = options
+        if (isArray(notCachedComputedProperties) && inArray(key, notCachedComputedProperties)) {
+          return getter.call(this.$__context || this)
+        }
+
         let value = parse(this.$__data, key)
         return value
       },
@@ -990,7 +1005,7 @@ export class Objext {
     let listeners = [].concat(this.$__listeners)
     let deps = [].concat(this.$__deps)
     let computers = Object.assign({}, this.$__computers)
-    let context = this.$__context
+    let context = this.$__context || this
     let refers = [].concat(this.$__refers)
 
     let item = {
@@ -1279,7 +1294,7 @@ export class Objext {
     let deps = this.$__deps
     let listeners = this.$__listeners
     let computers = this.$__computers
-    let context = this.$__context
+    let context = this.$__context || this
     let refers = this.$__refers
 
     objx.$put(value)
@@ -1346,6 +1361,11 @@ export class Objext {
   toString() {
     return JSON.stringify(this.valueOf())
   }
+}
+
+Objext.defaultOptions = {
+  notCachedComputedProperties: [],
+  newChildObjext: null,
 }
 
 Objext.parse = parse
